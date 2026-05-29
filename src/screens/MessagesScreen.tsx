@@ -1,5 +1,6 @@
 import React from 'react'
 import { ArrowLeft, Search } from 'lucide-react'
+import { StatusBar } from '../components/ui/StatusBar'
 
 interface MessagesScreenProps {
   onBack?: () => void
@@ -14,11 +15,8 @@ export function MessagesScreen({ onBack }: MessagesScreenProps) {
 
   return (
     <div className="screen bg-[#f8fafc] flex flex-col">
-      {/* Status bar */}
-      <div className="status-bar light px-6 pt-1 text-[#1c1f2a]">
-        <div>9:41</div>
-        <div className="flex gap-1.5 text-xs"><span>●●●●●</span><span>100%</span></div>
-      </div>
+      {/* Design system StatusBar */}
+      <StatusBar variant="light" />
 
       {/* Header */}
       <div className="px-6 pt-2 pb-3 flex items-center gap-3">

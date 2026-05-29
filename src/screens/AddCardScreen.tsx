@@ -7,6 +7,7 @@ import { TopBar } from '../components/ui/TopBar'
 import { CreditCard } from '../components/ui/CreditCard'
 import { Input } from '../components/ui/Input'
 import { Button } from '../components/ui/Button'
+import { useBooking, PaymentMethod } from '../context/BookingContext'
 
 interface AddCardScreenProps {
   onBack?: () => void
@@ -17,10 +18,13 @@ interface AddCardScreenProps {
 
 export function AddCardScreen({ onBack, onAddCardSuccess, variant = 'dark' }: AddCardScreenProps) {
   const isDark = variant === 'dark'
+  const { addPaymentMethod } = useBooking()
+
   const [isProcessing, setIsProcessing] = useState(false)
-  const [cardNumber, setCardNumber] = useState('Mastercard')
-  const [expiry, setExpiry] = useState('')
-  const [cvv, setCvv] = useState('')
+  const [cardNumber, setCardNumber] = useState('4242 4242 4242 4242')
+  const [expiry, setExpiry] = useState('12/28')
+  const [cvv, setCvv] = useState('123')
+  const [cardholder, setCardholder] = useState('Porsing Wilson')
   const [error, setError] = useState('')
 
   const bgColor = isDark ? '#121826' : '#f8fafc'
@@ -41,6 +45,27 @@ export function AddCardScreen({ onBack, onAddCardSuccess, variant = 'dark' }: Ad
 
     setIsProcessing(true)
     await new Promise(r => setTimeout(r, 920)) // simulate processing + haptic delay
+
+    // Extract last4 and detect brand from card number
+    const digits = cardNumber.replace(/\s+/g, '')
+    const last4 = digits.slice(-4) || '0000'
+    let brand = 'Visa'
+    let type: PaymentMethod['type'] = 'visa'
+    if (digits.startsWith('5')) { brand = 'Mastercard'; type = 'mastercard' }
+    else if (digits.startsWith('3')) { brand = 'Amex'; type = 'mastercard' }
+    else if (digits.startsWith('6')) { brand = 'Discover'; type = 'mastercard' }
+
+    const newPayment: PaymentMethod = {
+      id: 'pm_' + Date.now().toString(36),
+      type,
+      last4,
+      brand,
+      isDefault: true,
+    }
+
+    // Wire to global state so Confirm screen + Profile immediately reflect it
+    addPaymentMethod(newPayment)
+
     setIsProcessing(false)
     onAddCardSuccess?.()
   }
@@ -89,6 +114,22 @@ export function AddCardScreen({ onBack, onAddCardSuccess, variant = 'dark' }: Ad
             style={{ color: textColor }}
           />
           <Camera size={20} className="text-[#4c5df9]" />
+        </div>
+
+        {/* Cardholder name */}
+        <div 
+          className="flex items-center gap-4 rounded-2xl px-5 py-4"
+          style={{ backgroundColor: inputBg }}
+        >
+          <span className="text-[#4c5df9] text-sm w-5">👤</span>
+          <input 
+            type="text" 
+            value={cardholder}
+            onChange={(e) => setCardholder(e.target.value)}
+            className="flex-1 bg-transparent text-[17px] font-medium outline-none" 
+            style={{ color: textColor }}
+            placeholder="Cardholder name"
+          />
         </div>
 
         {/* Expiry + CVV - using Input for consistency */}
