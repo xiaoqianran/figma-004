@@ -1,0 +1,275 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #4c5df9;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.font-poppins {
+  font-family: 'Poppins', 'Inter', system-ui, sans-serif;
+}
+
+/* Phone Frame Styles */
+.phone-frame {
+  width: 375px;
+  height: 812px;
+  background: #000;
+  border-radius: 60px;
+  padding: 12px;
+  box-shadow: 
+    0 0 0 10px #1a1a1a,
+    0 0 0 14px #111,
+    0 20px 60px -10px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(255,255,255,0.1);
+  position: relative;
+}
+
+.phone-frame::before {
+  /* Disabled: using improved .dynamic-island rendered inside phone-screen for authentic iPhone 14 Pro look */
+  content: none;
+}
+
+.phone-screen {
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  border-radius: 48px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Dark mode screen */
+.phone-screen.dark {
+  background: #121826;
+}
+
+/* Screen content base */
+.screen {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* === Legacy support for old classNames during migration (kept for fidelity) === */
+.btn-primary {
+  background-color: #4c5df9;
+  color: white;
+  border-radius: 12px;
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary:hover {
+  background-color: #3b4dd9;
+  transform: translateY(-1px);
+}
+
+.input-field {
+  background-color: #f1f3f5;
+  border: none;
+  border-radius: 12px;
+  padding: 16px 20px;
+  font-size: 15px;
+  color: #1c1f2a;
+  width: 100%;
+  outline: none;
+}
+
+.input-field::placeholder {
+  color: #90959e;
+}
+
+.input-field:focus {
+  box-shadow: 0 0 0 3px rgba(76, 93, 249, 0.15);
+}
+
+/* Status bar legacy */
+.status-bar {
+  height: 44px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.status-bar.light {
+  color: #1c1f2a;
+}
+
+/* Spinner for loading states in buttons (used by screens) */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-text {
+  color: #fe5050;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* Enhanced Phone Realism - Dynamic Island + Home Indicator */
+.phone-frame {
+  /* slightly refined outer shadow for premium device feel */
+  box-shadow: 
+    0 0 0 10px #1a1a1a,
+    0 0 0 14px #111,
+    0 25px 70px -15px rgba(0, 0, 0, 0.75),
+    0 10px 30px -5px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255,255,255,0.08);
+}
+
+.dynamic-island {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 126px;
+  height: 30px;
+  background: #000;
+  border-radius: 20px;
+  z-index: 60;
+  box-shadow: 
+    inset 0 1px 0 rgba(255,255,255,0.15),
+    0 0 0 1px rgba(0,0,0,0.9);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.dynamic-island::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background: #111;
+  border-radius: 50%;
+  position: relative;
+  box-shadow: 0 0 2px rgba(0,0,0,0.8);
+}
+
+.dynamic-island::after {
+  content: '';
+  width: 4px;
+  height: 4px;
+  background: #222;
+  border-radius: 50%;
+  position: relative;
+}
+
+.home-indicator {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 134px;
+  height: 5px;
+  background: rgba(0, 0, 0, 0.85);
+  border-radius: 3px;
+  z-index: 55;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.phone-screen.light .home-indicator {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+/* Toast styles inside phone */
+.toast {
+  font-size: 14px;
+  font-weight: 500;
+  padding: 12px 16px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3), 0 4px 6px -1px rgba(0,0,0,0.1);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+}
+
+.toast.success { background: #10b981; color: white; }
+.toast.error { background: #ef4444; color: white; }
+.toast.info { background: #1f2937; color: #f3f4f6; }
+
+/* Micro interaction helpers */
+.motion-button:active {
+  transition: transform 0.08s cubic-bezier(0.23, 1, 0.32, 1) !important;
+}
+
+/* Loading spinner */
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Success checkmark */
+.success-check {
+  width: 48px;
+  height: 48px;
+}
+
+.success-check circle {
+  stroke-dasharray: 120;
+  stroke-dashoffset: 120;
+  animation: check-circle 0.5s ease forwards;
+}
+
+.success-check path {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: check-draw 0.4s 0.3s ease forwards;
+}
+
+@keyframes check-circle {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes check-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Progress bar for payment */
+.progress-bar {
+  height: 4px;
+  background: #4c5df9;
+  border-radius: 999px;
+  transition: width 120ms linear;
+}
+
+/* Input focus + error states enhanced */
+.input-field.error {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+  border: 1px solid #ef4444;
+}
+
+.error-text {
+  font-size: 12px;
+  color: #ef4444;
+  margin-top: 4px;
+  padding-left: 4px;
+}
