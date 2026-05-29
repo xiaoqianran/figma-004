@@ -33,6 +33,8 @@
 - 设计系统（Design System）：Button、Input、Card、StatusBar、TopBar、RideCard 等可复用组件
 - 支付方式管理、通知开关、主题切换等功能页面
 - 支持 Google / Facebook 一键直接登录（模拟）
+- 新增：Ride History（带快速重订）、更丰富的 Home 地图交互（可点击热点 + 最近目的地 + 活跃乘车横幅）、实时 ETA 模拟、评分页动态小费预设
+- 通知偏好、主题持久化在多个页面实时生效
 
 ---
 
@@ -71,6 +73,8 @@ npm run dev
 | `npm run lint:fix`      | 自动修复 lint 问题            |
 | `npm run format`        | 使用 Prettier 格式化代码      |
 | `npm run test`          | 运行测试                      |
+| `npm run typecheck`     | TypeScript 类型检查           |
+| `npm run ci:verify`     | CI 本地全量验证（lint+type+test+build） |
 
 ---
 
@@ -78,9 +82,15 @@ npm run dev
 
 本项目已配置 GitHub Actions，推送 `main` 分支后会自动部署到 GitHub Pages。
 
-部署地址：https://xiaoqianran.github.io/figma-004/
+- 部署地址：https://xiaoqianran.github.io/figma-004/
+- 部署流程文件：`.github/workflows/deploy.yml`
+- **质量门禁**：部署前自动执行 `lint`、`typecheck`、`test` 和 `build`，失败即阻断，保护线上可用性。
+- 采用 `peaceiris/actions-gh-pages` + `.nojekyll` + SPA `404.html` 回退，部署更稳定可靠。
 
-部署流程文件位于：`.github/workflows/deploy.yml`
+本地一键验证（与 CI 一致）：
+```bash
+npm run ci:verify
+```
 
 ---
 
@@ -95,7 +105,8 @@ npm run dev
 - 支付添加页（深色/浅色）+ 扫码支付页
 - 实时行程跟踪页（支持手动控制状态）
 - 评价与打赏页（含数字键盘）
-- 消息页、个人资料页、设置页、礼品码页等
+- 消息页、个人资料页、设置页、礼品码页、Ride History（含重订）等
+- 完整 Gallery 模式已覆盖全部核心屏幕（含 BookingConfirm、Tracking、Profile、History 等）
 
 ---
 
