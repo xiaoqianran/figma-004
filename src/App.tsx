@@ -223,7 +223,13 @@ export default function App() {
 
       // Expanded high-fidelity screens (implemented via Screen Expansion task)
       case 'home':
-        return <HomeScreen onBookRide={() => setCurrentScreen('destination')} />
+        return (
+          <HomeScreen 
+            onBookRide={() => setCurrentScreen('destination')}
+            onSearchDestination={() => setCurrentScreen('destination')}
+            onQuickDestination={() => setCurrentScreen('destination')}
+          />
+        )
       
       case 'settings-dark':
         return <SettingsPage variant="dark" onBack={() => setCurrentScreen('home')} />
@@ -371,8 +377,8 @@ export default function App() {
 
           {isFullFlow && (
             <div className="text-center mt-2">
-              <span className="text-[10px] px-2.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
-                Experimental — Flow agent encountered a repetitive edit loop and was cancelled. Gallery mode has all new screens.
+              <span className="text-[10px] px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                Full App Mode — End-to-end booking flow with global state (work in progress)
               </span>
             </div>
           )}
