@@ -2,18 +2,22 @@ import { useState } from 'react'
 import { MapPin, Clock, Navigation } from 'lucide-react'
 import { StatusBar } from '../components/ui/StatusBar'
 import { Button } from '../components/ui/Button'
+import { Card } from '../components/ui/Card'
+import { useBooking } from '../context/BookingContext'
 
 interface HomeScreenProps {
   onBack?: () => void
   onBookRide?: () => void
   onSearchDestination?: () => void
-  onQuickDestination?: (dest: { label: string; sub?: string }) => void
+  onQuickDestination?: (dest: { label?: string; sub?: string; address?: string } | string) => void
   onViewActiveRide?: () => void
   showToast?: (message: string, type?: 'success' | 'error' | 'info') => void
 }
 
-export function HomeScreen({ onBack: _onBack, onBookRide }: HomeScreenProps) {
-  const [selectedRideType, setSelectedRideType] = useState<'economy' | 'comfort' | 'xl'>('comfort')
+export function HomeScreen({ onBack: _onBack, onBookRide, onSearchDestination, onQuickDestination, onViewActiveRide }: HomeScreenProps) {
+  const { state, setPreferredRideType } = useBooking()
+  const { user, activeRide, preferredRideType: selectedRideType = 'comfort' } = state
+
   const [pickup, setPickup] = useState('Current Location')
 
   const rideTypes = [
@@ -37,21 +41,48 @@ export function HomeScreen({ onBack: _onBack, onBookRide }: HomeScreenProps) {
       <div className="px-5 pt-3 pb-2 flex items-center justify-between">
         <div>
           <div className="text-xs text-gray-500">Good morning</div>
-          <div className="font-semibold text-xl -mt-0.5" style={{ fontFamily: 'Sen, system-ui, sans-serif' }}>Porsing Wilson</div>
+          <div className="font-semibold text-xl -mt-0.5" style={{ fontFamily: 'Sen, system-ui, sans-serif' }}>{user?.name || 'Porsing Wilson'}</div>
         </div>
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#4c5df9] to-violet-500 flex items-center justify-center text-white font-bold shadow">PW</div>
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#4c5df9] to-violet-500 flex items-center justify-center text-white font-bold shadow text-sm tracking-tight">
+          {(user?.name || 'PW').split(/\s+/).map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+        </div>
       </div>
+
+      {/* Current ride summary (high-value polish for Full-Flow) */}
+      {activeRide && (
+        <div className="px-5 pb-2">
+          <Card variant="elevated" padding="sm" className="border-emerald-100 bg-emerald-50/60">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center text-white text-lg">🚕</div>
+                <div>
+                  <div className="font-semibold text-sm text-emerald-800 tracking-tight">Active ride • {activeRide.ride.name}</div>
+                  <div className="text-emerald-700 text-xs">{activeRide.destination.address} • {activeRide.status.replace('_', ' ')}</div>
+                </div>
+              </div>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={() => onViewActiveRide?.()}
+                className="h-8 px-3 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+              >
+                Track
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Search bar */}
       <div className="px-5 pt-1 pb-3">
         <button 
-          onClick={() => alert('Search destinations (opens destination picker demo)')}
+          onClick={() => onSearchDestination?.()}
           className="w-full bg-white shadow-sm border border-gray-100 rounded-3xl px-5 py-[15px] flex items-center gap-3 active:bg-gray-50"
         >
           <MapPin className="text-[#4c5df9]" size={21} />
           <div className="flex-1 text-left">
             <div className="text-sm text-gray-500">Where to?</div>
-            <div className="font-medium text-base -mt-0.5">Search destination or address</div>
+            <div className="font-medium text-base -mt-0.5">Search destinations</div>
           </div>
           <Navigation size={18} className="text-gray-400" />
         </button>
@@ -106,7 +137,7 @@ export function HomeScreen({ onBack: _onBack, onBookRide }: HomeScreenProps) {
           {quickPlaces.map((p, i) => (
             <button 
               key={i}
-              onClick={() => alert(`Set destination to ${p.label}`)}
+              onClick={() => onQuickDestination?.(p)}
               className="flex-shrink-0 bg-white border border-gray-100 rounded-2xl px-4 py-3 min-w-[108px] text-left active:bg-gray-50"
             >
               <div className="text-xl mb-0.5">{p.icon}</div>
@@ -127,7 +158,7 @@ export function HomeScreen({ onBack: _onBack, onBookRide }: HomeScreenProps) {
             return (
               <button
                 key={rt.id}
-                onClick={() => setSelectedRideType(rt.id)}
+                onClick={() => setPreferredRideType(rt.id)}
                 className={`rounded-2xl p-3 border transition-all text-left ${active ? 'border-[#4c5df9] bg-[#eef3ff]' : 'border-gray-100 bg-white active:bg-gray-50'}`}
               >
                 <div className="text-2xl mb-1">{rt.icon}</div>
@@ -146,8 +177,10 @@ export function HomeScreen({ onBack: _onBack, onBookRide }: HomeScreenProps) {
       <div className="p-5 pt-1 bg-white border-t border-gray-100">
         <Button 
           onClick={() => {
+            // Remember the chosen ride preference in global BookingContext (drives downstream flows)
+            setPreferredRideType(selectedRideType)
             if (onBookRide) onBookRide()
-            else alert(`Requesting ${selectedRideType} ride from ${pickup} (demo)`)
+            else onSearchDestination?.() // Start proper booking flow in full-flow
           }}
           fullWidth
           className="h-[54px] text-lg flex items-center justify-center gap-2"
