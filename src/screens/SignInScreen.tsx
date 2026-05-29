@@ -30,6 +30,25 @@ export function SignInScreen({
 
   const isCreate = variant === 'create'
 
+  // Direct social login (Google / Facebook) → immediate login
+  const handleGoogleLogin = () => {
+    if (onLoginSuccess) {
+      onLoginSuccess('Google User', 'user@gmail.com')
+    } else if (onLogin) {
+      onLogin()
+    }
+    showToast?.('Signed in with Google', 'success')
+  }
+
+  const handleFacebookLogin = () => {
+    if (onLoginSuccess) {
+      onLoginSuccess('Facebook User', 'user@facebook.com')
+    } else if (onLogin) {
+      onLogin()
+    }
+    showToast?.('Signed in with Facebook', 'success')
+  }
+
   // Realistic form validation + error states
   const validate = () => {
     const newErrors: typeof errors = {}
@@ -183,12 +202,20 @@ export function SignInScreen({
 
         {!isCreate && (
           <div className="flex justify-center gap-4 mt-4">
-            <button className="w-12 h-12 rounded-full border flex items-center justify-center active:bg-gray-50">
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              onClick={handleGoogleLogin}
+              className="w-12 h-12 rounded-full border flex items-center justify-center active:bg-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
+            >
               <span className="text-[#ea4335] font-bold text-xl">G</span>
-            </button>
-            <button className="w-12 h-12 rounded-full border flex items-center justify-center active:bg-gray-50">
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              onClick={handleFacebookLogin}
+              className="w-12 h-12 rounded-full border flex items-center justify-center active:bg-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
+            >
               <span className="text-[#1877f2] font-bold text-xl">f</span>
-            </button>
+            </motion.button>
           </div>
         )}
       </div>
