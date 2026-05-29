@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import React, { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PhoneFrame, type ToastItem } from './components/PhoneFrame'
 import { SplashScreen } from './screens/SplashScreen'
@@ -15,8 +15,63 @@ import { GiftCodePage } from './screens/GiftCodePage'
 import { CarResultV2Screen } from './screens/CarResultV2Screen'
 import { RideshareApp } from './components/RideshareApp'
 import { BookingProvider } from './context/BookingContext'
+// Additional high-fidelity screens for complete Gallery coverage
+import { BookingConfirmScreen } from './screens/BookingConfirmScreen'
+import { RideTrackingScreen } from './screens/RideTrackingScreen'
+import { ProfileScreen } from './screens/ProfileScreen'
+import { MessagesScreen } from './screens/MessagesScreen'
+import { RideHistoryScreen } from './screens/RideHistoryScreen'
 // Design System UI kit now powers most screens (Button, Input, Card, StatusBar, TopBar, RideCard, CreditCard...)
 import './theme' // side-effect import for any consumers if needed
+
+/**
+ * Lightweight error boundary for the phone preview area.
+ * Prevents a single screen crash from taking down the entire gallery/full-flow demo.
+ */
+class PreviewErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // In a real app this would go to an error reporting service
+    console.warn('[PreviewErrorBoundary] Caught render error in phone frame:', error, errorInfo)
+  }
+  handleRetry = () => {
+    this.setState({ hasError: false, error: undefined })
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-[#0f1117] text-white p-6 text-center">
+          <div className="text-4xl mb-3">⚠️</div>
+          <div className="font-semibold text-lg mb-1">Preview error</div>
+          <div className="text-sm text-white/60 mb-4 max-w-[260px]">
+            Something went wrong rendering this screen. This is isolated to the preview.
+          </div>
+          <button
+            onClick={this.handleRetry}
+            className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm font-medium border border-white/20"
+          >
+            Retry preview
+          </button>
+          {this.state.error && (
+            <div className="mt-4 text-[10px] text-white/40 font-mono max-w-full overflow-hidden">
+              {this.state.error.message}
+            </div>
+          )}
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 type ScreenKey = 
   | 'splash-dark' 
@@ -35,6 +90,11 @@ type ScreenKey =
   | 'gift-code'
   | 'home'
   | 'car-result-v2'
+  | 'booking-confirm'
+  | 'ride-tracking'
+  | 'profile'
+  | 'messages-screen'
+  | 'ride-history'
 
 const screens: { key: ScreenKey; label: string; group: string }[] = [
   { key: 'splash-dark', label: 'Splash (Dark)', group: 'Onboarding' },
@@ -46,12 +106,17 @@ const screens: { key: ScreenKey; label: string; group: string }[] = [
   { key: 'card-scan-dark', label: 'Card Scan', group: 'Payment' },
   { key: 'destination', label: 'Destination', group: 'Booking' },
   { key: 'car-result', label: 'Car Results', group: 'Booking' },
+  { key: 'booking-confirm', label: 'Booking Confirm', group: 'Booking' },
 
   { key: 'home', label: 'Home / Map', group: 'Core App' },
+  { key: 'ride-tracking', label: 'Ride Tracking (Live)', group: 'Core App' },
   { key: 'settings-dark', label: 'Settings (Dark)', group: 'Core App' },
   { key: 'settings-light', label: 'Settings (Light)', group: 'Core App' },
   { key: 'rating-tips', label: 'Rating & Tips (Keypad)', group: 'Core App' },
   { key: 'messages', label: 'Messages (List + Chat)', group: 'Core App' },
+  { key: 'messages-screen', label: 'Messages (Alt)', group: 'Core App' },
+  { key: 'profile', label: 'Profile', group: 'Core App' },
+  { key: 'ride-history', label: 'Ride History', group: 'Core App' },
   { key: 'gift-code', label: 'Gift Code', group: 'Core App' },
   { key: 'car-result-v2', label: 'Car Results V2', group: 'Booking' },
 ]
@@ -63,6 +128,18 @@ export default function App() {
 
   // Gallery (stable, all beautiful screens) vs Full-Flow (experimental - one agent hit a loop during development)
   const [demoMode, setDemoMode] = useState<'gallery' | 'full-flow'>('gallery')
+
+  // Robust toggle: remount RideshareApp on entry to guarantee clean internal state (viewHistory, navTab, currentView, etc.)
+  const [flowResetKey, setFlowResetKey] = useState(0)
+  const handleToggleDemoMode = () => {
+    const enteringFull = demoMode !== 'full-flow'
+    if (enteringFull) {
+      setFlowResetKey(k => k + 1)
+    } else {
+      setCurrentScreen('splash-dark')
+    }
+    setDemoMode(enteringFull ? 'full-flow' : 'gallery')
+  }
 
   // Premium toast system with spring animation (feels alive)
   const showToast = useCallback((message: string, type: ToastItem['type'] = 'success') => {
@@ -232,9 +309,9 @@ export default function App() {
         )
       
       case 'settings-dark':
-        return <SettingsPage variant="dark" onBack={() => setCurrentScreen('home')} />
+        return <SettingsPage variant="dark" onBack={() => setCurrentScreen('home')} onViewHistory={() => setCurrentScreen('ride-history')} onAddPayment={() => setCurrentScreen('add-card-dark')} />
       case 'settings-light':
-        return <SettingsPage variant="light" onBack={() => setCurrentScreen('home')} />
+        return <SettingsPage variant="light" onBack={() => setCurrentScreen('home')} onViewHistory={() => setCurrentScreen('ride-history')} onAddPayment={() => setCurrentScreen('add-card-light')} />
       
       case 'rating-tips':
         return <RatingAndTipsPage variant="dark" onBack={() => setCurrentScreen('home')} />
@@ -247,6 +324,33 @@ export default function App() {
       
       case 'car-result-v2':
         return <CarResultV2Screen onBack={() => setCurrentScreen('home')} />
+      
+      // Newly wired complete-coverage gallery screens
+      case 'booking-confirm':
+        return <BookingConfirmScreen onBack={() => setCurrentScreen('car-result')} onConfirm={() => { showToast('Booking confirmed (demo)'); setCurrentScreen('ride-tracking') }} onAddPayment={() => setCurrentScreen('add-card-light')} />
+      
+      case 'ride-tracking':
+        return <RideTrackingScreen 
+          onBack={() => setCurrentScreen('home')} 
+          onComplete={() => { showToast('Ride completed'); setCurrentScreen('rating-tips') }}
+          onCancel={() => setCurrentScreen('home')}
+          onRideCompleted={() => setCurrentScreen('rating-tips')}
+        />
+      
+      case 'profile':
+        return <ProfileScreen 
+          onBack={() => setCurrentScreen('home')}
+          onManagePayments={() => setCurrentScreen('add-card-light')}
+          onOpenSettings={() => setCurrentScreen('settings-light')}
+          onViewActiveRide={() => setCurrentScreen('ride-tracking')}
+          onLogout={() => setCurrentScreen('splash-dark')}
+        />
+      
+      case 'messages-screen':
+        return <MessagesScreen onBack={() => setCurrentScreen('home')} />
+      
+      case 'ride-history':
+        return <RideHistoryScreen onBack={() => setCurrentScreen('home')} {...commonToast} />
       
       default:
         return <SplashScreen variant="dark" {...commonToast} />
@@ -276,7 +380,7 @@ export default function App() {
         <div className="mb-5 px-1">
           <div className="text-[10px] uppercase tracking-widest text-white/40 mb-2">EXPERIENCE</div>
           <button
-            onClick={() => setDemoMode(isFullFlow ? 'gallery' : 'full-flow')}
+            onClick={handleToggleDemoMode}
             className={`w-full rounded-2xl px-4 py-3 text-left font-medium text-sm transition border ${isFullFlow ? 'bg-[#4c5df9] text-white border-[#4c5df9]' : 'bg-white/5 hover:bg-white/10 border-white/10'}`}
           >
             {isFullFlow ? '✓  Full App Flow (with Bottom Nav + State)' : 'Switch to Full App Flow Demo'}
@@ -346,27 +450,29 @@ export default function App() {
             toasts={isFullFlow ? [] : toasts} 
             onDismissToast={isFullFlow ? undefined : dismissToast}
           >
-            {isFullFlow ? (
-              <RideshareApp />
-            ) : (
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={currentScreen}
-                  className="w-full h-full"
-                  initial={{ opacity: 0, x: 26, scale: 0.982 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: -16, scale: 0.988 }}
-                  transition={{ 
-                    type: 'spring', 
-                    stiffness: 340, 
-                    damping: 32, 
-                    mass: 0.9 
-                  }}
-                >
-                  {renderScreen()}
-                </motion.div>
-              </AnimatePresence>
-            )}
+            <PreviewErrorBoundary>
+              {isFullFlow ? (
+                <RideshareApp key={`full-flow-${flowResetKey}`} />
+              ) : (
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={currentScreen}
+                    className="w-full h-full"
+                    initial={{ opacity: 0, x: 26, scale: 0.982 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: -16, scale: 0.988 }}
+                    transition={{ 
+                      type: 'spring', 
+                      stiffness: 340, 
+                      damping: 32, 
+                      mass: 0.9 
+                    }}
+                  >
+                    {renderScreen()}
+                  </motion.div>
+                </AnimatePresence>
+              )}
+            </PreviewErrorBoundary>
           </PhoneFrame>
 
           <div className="text-center mt-4 text-xs text-white/40">

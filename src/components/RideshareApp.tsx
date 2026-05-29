@@ -9,12 +9,15 @@ import { DestinationScreen } from '../screens/DestinationScreen'
 import { CarResultScreen } from '../screens/CarResultScreen'
 import { AddCardScreen } from '../screens/AddCardScreen'
 import { BookingConfirmScreen } from '../screens/BookingConfirmScreen'
-import { RideTrackingScreen } from '../screens/RidesTrackingScreen'
+import { RideTrackingScreen } from '../screens/RideTrackingScreen'
 
 // New screens
 import { HomeScreen } from '../screens/HomeScreen'
 import { MessagesScreen } from '../screens/MessagesScreen'
 import { ProfileScreen } from '../screens/ProfileScreen'
+import { SettingsPage } from '../screens/SettingsPage'
+import { RatingAndTipsPage } from '../screens/RatingAndTipsPage'
+import { RideHistoryScreen } from '../screens/RideHistoryScreen'
 import { BottomNavBar, NavTab } from './BottomNavBar'
 
 // Main views for the integrated experience
@@ -28,6 +31,8 @@ type AppView =
   | 'booking-confirm'
   | 'add-payment'
   | 'ride-tracking'
+  | 'rating'
+  | 'history'
 
 interface RideshareAppProps {
   initialView?: AppView
@@ -37,6 +42,7 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
   const [currentView, setCurrentView] = useState<AppView>(initialView)
   const [navTab, setNavTab] = useState<NavTab>('home')
   const [, setPendingDestination] = useState<Location | null>(null)
+  const [profileView, setProfileView] = useState<'main' | 'settings'>('main')
 
   const { 
     state, 
@@ -47,7 +53,10 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
     stopLoading, 
     confirmBooking, 
     findRides, 
-    resetBooking 
+    updateRideStatus,
+    completeRide,
+    resetBooking,
+    submitRating,
   } = useBooking()
 
   const isAuthenticated = state.isAuthenticated
@@ -68,7 +77,7 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
       setCurrentView(prev)
     } else {
       // Sensible fallbacks
-      if (['destination', 'car-results', 'booking-confirm', 'add-payment'].includes(currentView)) {
+      if (['destination', 'car-results', 'booking-confirm', 'add-payment', 'rating'].includes(currentView)) {
         setCurrentView('home')
         setNavTab('home')
       } else if (['signin-welcome', 'signin-create'].includes(currentView)) {
@@ -142,23 +151,33 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
     navigateTo('add-payment')
   }
 
-  // After adding payment in flow
+  // After adding payment in flow (AddCardScreen now sets the method via context)
   const handlePaymentAdded = () => {
-    // go back to confirm or straight to processing
+    stopLoading()
     if (currentView === 'add-payment') {
-      // Simulate payment success
-      startLoading('Verifying card...')
-      setTimeout(async () => {
-        stopLoading()
-        // Now confirm the booking
-        confirmBooking()
-        setCurrentView('ride-tracking')
-      }, 680)
+      // If user came from Profile > Payments, return to profile overlay (keep navTab)
+      if (navTab === 'profile') {
+        setCurrentView('home')
+        setProfileView('main')
+      } else {
+        // Booking flow: go back to confirm to see updated payment
+        setCurrentView('booking-confirm')
+      }
     }
   }
 
-  // From tracking back to home (ride ended)
+  // Full flow: after ride arrives/completes in tracking -> show rating
+  const handleShowRating = () => {
+    // Ensure status is completed but KEEP activeRide for RatingAndTipsPage to read
+    if (state.activeRide && state.activeRide.status !== 'completed') {
+      updateRideStatus('completed')
+    }
+    navigateTo('rating')
+  }
+
+  // Final reset after rating submitted (or cancel from tracking)
   const handleRideComplete = () => {
+    completeRide()
     resetBooking()
     setCurrentView('home')
     setNavTab('home')
@@ -175,10 +194,10 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
       // Search tab = open destination flow
       handleOpenDestination()
     } else if (tab === 'messages') {
-      setCurrentView('home') // we render messages as overlay or just switch
-      // For simplicity we stay on home but could push messages view. Here we show it inline below
+      setCurrentView('home') // Messages rendered as overlay when tab active
     } else if (tab === 'profile') {
-      setCurrentView('home')
+      setCurrentView('home') // Profile rendered as overlay when tab active
+      setProfileView('main')
     }
   }
 
@@ -253,15 +272,33 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
                 exit={{ opacity: 0 }}
                 className="absolute inset-0 bg-[#f8fafc] z-40"
               >
-                <ProfileScreen 
-                  onBack={() => { setNavTab('home'); setCurrentView('home') }} 
-                  onManagePayments={() => navigateTo('add-payment')}
-                  onLogout={() => {
-                    setCurrentView('splash')
-                    setNavTab('home')
-                    setViewHistory([])
-                  }}
-                />
+                {profileView === 'main' ? (
+                  <ProfileScreen 
+                    onBack={() => { setNavTab('home'); setCurrentView('home') }} 
+                    onManagePayments={() => {
+                      setProfileView('main')
+                      navigateTo('add-payment')
+                    }}
+                    onOpenSettings={() => setProfileView('settings')}
+                    onViewActiveRide={() => { setNavTab('home'); setCurrentView('ride-tracking') }}
+                    onLogout={() => {
+                      setCurrentView('splash')
+                      setNavTab('home')
+                      setViewHistory([])
+                      setProfileView('main')
+                    }}
+                  />
+                ) : (
+                  <SettingsPage 
+                    variant="light"
+                    onBack={() => setProfileView('main')}
+                    onAddPayment={() => {
+                      setProfileView('main')
+                      navigateTo('add-payment')
+                    }}
+                    onViewHistory={() => navigateTo('history')}
+                  />
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -322,7 +359,43 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
             setCurrentView('home') 
             setNavTab('home')
           }} 
-          onComplete={handleRideComplete} 
+          onCancel={() => {
+            handleRideComplete() // cancel clears ride and returns home
+          }}
+          onRideCompleted={handleShowRating}
+          onComplete={handleRideComplete} // fallback / cancel path
+        />
+      )
+    }
+
+    if (currentView === 'rating') {
+      return (
+        <RatingAndTipsPage 
+          variant="light"
+          onBack={() => {
+            // Back from rating without submit -> still complete the ride and home
+            handleRideComplete()
+          }}
+          onSubmit={(rating: number, tip: number) => {
+            submitRating(rating, tip)
+            // After submit, clear and return home with small delay for success UX
+            startLoading('Thank you for your feedback!')
+            setTimeout(() => {
+              stopLoading()
+              handleRideComplete()
+            }, 950)
+          }}
+          onDone={() => {
+            handleRideComplete()
+          }}
+        />
+      )
+    }
+
+    if (currentView === 'history') {
+      return (
+        <RideHistoryScreen 
+          onBack={goBack}
         />
       )
     }

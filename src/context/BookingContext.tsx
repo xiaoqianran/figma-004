@@ -51,7 +51,9 @@ export interface BookingState {
   pickup: Location | null
   destination: Location | null
   selectedRide: RideOption | null
+  preferredRideType: 'economy' | 'comfort' | 'xl'
   paymentMethod: PaymentMethod | null
+  paymentMethods: PaymentMethod[]
 
   // App flow UI
   isLoading: boolean
@@ -60,8 +62,28 @@ export interface BookingState {
   // Post-booking
   activeRide: ActiveRide | null
 
+  // Rating after ride completion
+  lastRating: { rating: number; tip: number; bookingId?: string } | null
+
+  // Completed ride history (persisted demo data)
+  completedRides: Array<{
+    bookingId: string
+    rideName: string
+    price: number
+    destination: string
+    completedAt: string
+    rating?: number
+    tip?: number
+  }>
+
   // Recently used for convenience
   recentDestinations: Location[]
+
+  // User preferences (persisted in demo)
+  preferences: {
+    notificationsEnabled: boolean
+    theme: 'light' | 'dark'
+  }
 }
 
 type BookingAction =
@@ -70,13 +92,19 @@ type BookingAction =
   | { type: 'SET_PICKUP'; payload: Location }
   | { type: 'SET_DESTINATION'; payload: Location }
   | { type: 'SELECT_RIDE'; payload: RideOption }
+  | { type: 'SET_PREFERRED_RIDE_TYPE'; payload: 'economy' | 'comfort' | 'xl' }
   | { type: 'SET_PAYMENT_METHOD'; payload: PaymentMethod }
+  | { type: 'ADD_PAYMENT_METHOD'; payload: PaymentMethod }
+  | { type: 'UPDATE_USER'; payload: { name?: string; email?: string; phone?: string } }
+  | { type: 'SET_PREFERENCES'; payload: Partial<{ notificationsEnabled: boolean; theme: 'light' | 'dark' }> }
   | { type: 'SET_LOADING'; payload: { isLoading: boolean; message?: string } }
   | { type: 'CONFIRM_BOOKING' }
   | { type: 'UPDATE_RIDE_STATUS'; payload: RideStatus }
   | { type: 'COMPLETE_RIDE' }
+  | { type: 'SUBMIT_RATING'; payload: { rating: number; tip: number } }
   | { type: 'RESET_BOOKING' }
   | { type: 'ADD_RECENT_DESTINATION'; payload: Location }
+  | { type: 'ADD_COMPLETED_RIDE'; payload: { bookingId: string; rideName: string; price: number; destination: string; rating?: number; tip?: number } }
 
 const initialState: BookingState = {
   isAuthenticated: false,
@@ -84,6 +112,7 @@ const initialState: BookingState = {
   pickup: { address: 'Current Location', subtitle: '123 Market Street, SF' },
   destination: null,
   selectedRide: null,
+  preferredRideType: 'comfort',
   paymentMethod: {
     id: 'pm_1',
     type: 'visa',
@@ -91,13 +120,49 @@ const initialState: BookingState = {
     brand: 'Visa',
     isDefault: true,
   },
+  paymentMethods: [
+    {
+      id: 'pm_1',
+      type: 'visa',
+      last4: '4242',
+      brand: 'Visa',
+      isDefault: true,
+    },
+    {
+      id: 'pm_2',
+      type: 'mastercard',
+      last4: '8888',
+      brand: 'Mastercard',
+    },
+    {
+      id: 'pm_3',
+      type: 'applepay',
+      last4: '',
+      brand: 'Apple Pay',
+    },
+    {
+      id: 'pm_4',
+      type: 'cash',
+      last4: '',
+      brand: 'Cash',
+    },
+  ],
   isLoading: false,
   loadingMessage: '',
   activeRide: null,
+  lastRating: null,
+  completedRides: [
+    { bookingId: 'BK492183', rideName: 'Tesla Model 3', price: 12.4, destination: 'Home', completedAt: '2h ago', rating: 5, tip: 3 },
+    { bookingId: 'BK481902', rideName: 'Toyota Camry', price: 8.9, destination: 'Work', completedAt: 'Yesterday', rating: 4, tip: 0 },
+  ],
   recentDestinations: [
     { address: 'Home', subtitle: '456 Oak Avenue' },
     { address: 'Work', subtitle: '1 Market Street, Tower B' },
   ],
+  preferences: {
+    notificationsEnabled: true,
+    theme: 'light',
+  },
 }
 
 function bookingReducer(state: BookingState, action: BookingAction): BookingState {
@@ -130,8 +195,51 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
     case 'SELECT_RIDE':
       return { ...state, selectedRide: action.payload }
 
-    case 'SET_PAYMENT_METHOD':
-      return { ...state, paymentMethod: action.payload }
+    case 'SET_PREFERRED_RIDE_TYPE':
+      return { ...state, preferredRideType: action.payload }
+
+    case 'SET_PAYMENT_METHOD': {
+      const pm = action.payload
+      const existing = state.paymentMethods || []
+      const updatedList = existing.some((p) => p.id === pm.id)
+        ? existing.map((p) => ({ ...p, isDefault: p.id === pm.id }))
+        : [...existing, { ...pm, isDefault: true }]
+      return {
+        ...state,
+        paymentMethod: pm,
+        paymentMethods: updatedList,
+      }
+    }
+
+    case 'ADD_PAYMENT_METHOD': {
+      const pm = action.payload
+      const existing = state.paymentMethods || []
+      const filtered = existing.filter((p) => p.id !== pm.id)
+      return {
+        ...state,
+        paymentMethods: [...filtered, pm],
+        paymentMethod: pm,
+      }
+    }
+
+    case 'UPDATE_USER':
+      if (!state.user) return state
+      return {
+        ...state,
+        user: {
+          ...state.user,
+          ...action.payload,
+        },
+      }
+
+    case 'SET_PREFERENCES':
+      return {
+        ...state,
+        preferences: {
+          ...state.preferences,
+          ...action.payload,
+        },
+      }
 
     case 'SET_LOADING':
       return {
@@ -175,13 +283,39 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
         activeRide: { ...state.activeRide, status: action.payload },
       }
 
-    case 'COMPLETE_RIDE':
+    case 'COMPLETE_RIDE': {
+      // Archive current active ride into history if present
+      let newCompleted = state.completedRides
+      if (state.activeRide) {
+        const ar = state.activeRide
+        const already = state.completedRides.some(r => r.bookingId === ar.bookingId)
+        if (!already) {
+          newCompleted = [{
+            bookingId: ar.bookingId,
+            rideName: ar.ride.name,
+            price: ar.ride.price,
+            destination: ar.destination.address,
+            completedAt: 'Just now',
+          }, ...state.completedRides].slice(0, 12)
+        }
+      }
       return {
         ...state,
         activeRide: null,
         selectedRide: null,
         destination: null,
-        // keep pickup and payment
+        completedRides: newCompleted,
+      }
+    }
+
+    case 'SUBMIT_RATING':
+      return {
+        ...state,
+        lastRating: {
+          rating: action.payload.rating,
+          tip: action.payload.tip,
+          bookingId: state.activeRide?.bookingId,
+        },
       }
 
     case 'RESET_BOOKING':
@@ -202,6 +336,24 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
       return { ...state, recentDestinations: updatedRecents }
     }
 
+    case 'ADD_COMPLETED_RIDE': {
+      const p = action.payload
+      const exists = state.completedRides.some(r => r.bookingId === p.bookingId)
+      if (exists) return state
+      return {
+        ...state,
+        completedRides: [{
+          bookingId: p.bookingId,
+          rideName: p.rideName,
+          price: p.price,
+          destination: p.destination,
+          completedAt: 'Just now',
+          rating: p.rating,
+          tip: p.tip,
+        }, ...state.completedRides].slice(0, 12),
+      }
+    }
+
     default:
       return state
   }
@@ -216,14 +368,21 @@ interface BookingContextValue {
   setPickup: (loc: Location) => void
   setDestination: (loc: Location) => void
   selectRide: (ride: RideOption) => void
+  setPreferredRideType: (type: 'economy' | 'comfort' | 'xl') => void
   setPaymentMethod: (pm: PaymentMethod) => void
+  addPaymentMethod: (pm: PaymentMethod) => void
+  updateUser: (updates: { name?: string; email?: string; phone?: string }) => void
+  setNotificationsEnabled: (enabled: boolean) => void
+  setTheme: (theme: 'light' | 'dark') => void
   startLoading: (message: string) => void
   stopLoading: () => void
   confirmBooking: () => void
   updateRideStatus: (status: RideStatus) => void
   completeRide: () => void
+  submitRating: (rating: number, tip: number) => void
   resetBooking: () => void
   addRecentDestination: (loc: Location) => void
+  addCompletedRide: (ride: { bookingId: string; rideName: string; price: number; destination: string; rating?: number; tip?: number }) => void
   // Fake API helpers
   findRides: (destination: Location) => Promise<RideOption[]>
   processPayment: () => Promise<boolean>
@@ -247,6 +406,17 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         if (parsed.paymentMethod) {
           dispatch({ type: 'SET_PAYMENT_METHOD', payload: parsed.paymentMethod })
         }
+        if (parsed.paymentMethods && Array.isArray(parsed.paymentMethods)) {
+          // Restore full list; selected will be synced via last SET or first default
+          parsed.paymentMethods.forEach((pm: PaymentMethod) => {
+            if (pm.isDefault) {
+              dispatch({ type: 'SET_PAYMENT_METHOD', payload: pm })
+            }
+          })
+        }
+        if (parsed.preferences) {
+          dispatch({ type: 'SET_PREFERENCES', payload: parsed.preferences })
+        }
       } catch {
         // ignore corrupted storage
       }
@@ -259,9 +429,11 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       isAuthenticated: state.isAuthenticated,
       user: state.user,
       paymentMethod: state.paymentMethod,
+      paymentMethods: state.paymentMethods,
+      preferences: state.preferences,
     }
     localStorage.setItem('rideshare_booking_state', JSON.stringify(toSave))
-  }, [state.isAuthenticated, state.user, state.paymentMethod])
+  }, [state.isAuthenticated, state.user, state.paymentMethod, state.paymentMethods, state.preferences])
 
   const value: BookingContextValue = {
     state,
@@ -281,7 +453,18 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
     selectRide: (ride) => dispatch({ type: 'SELECT_RIDE', payload: ride }),
 
+    setPreferredRideType: (type) => dispatch({ type: 'SET_PREFERRED_RIDE_TYPE', payload: type }),
+
     setPaymentMethod: (pm) => dispatch({ type: 'SET_PAYMENT_METHOD', payload: pm }),
+
+    addPaymentMethod: (pm) => dispatch({ type: 'ADD_PAYMENT_METHOD', payload: pm }),
+
+    updateUser: (updates) => dispatch({ type: 'UPDATE_USER', payload: updates }),
+
+    setNotificationsEnabled: (enabled) =>
+      dispatch({ type: 'SET_PREFERENCES', payload: { notificationsEnabled: enabled } }),
+
+    setTheme: (theme) => dispatch({ type: 'SET_PREFERENCES', payload: { theme } }),
 
     startLoading: (message) =>
       dispatch({ type: 'SET_LOADING', payload: { isLoading: true, message } }),
@@ -294,10 +477,15 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
     completeRide: () => dispatch({ type: 'COMPLETE_RIDE' }),
 
+    submitRating: (rating, tip) => dispatch({ type: 'SUBMIT_RATING', payload: { rating, tip } }),
+
     resetBooking: () => dispatch({ type: 'RESET_BOOKING' }),
 
     addRecentDestination: (loc) =>
       dispatch({ type: 'ADD_RECENT_DESTINATION', payload: loc }),
+
+    addCompletedRide: (ride) =>
+      dispatch({ type: 'ADD_COMPLETED_RIDE', payload: ride }),
 
     // Fake API calls with realistic delays
     findRides: async (destination: Location): Promise<RideOption[]> => {
@@ -385,17 +573,27 @@ export function useBooking() {
       setPickup: () => {},
       setDestination: () => {},
       selectRide: () => {},
+      setPreferredRideType: () => {},
       setPaymentMethod: () => {},
+      addPaymentMethod: () => {},
+      updateUser: () => {},
+      setNotificationsEnabled: () => {},
+      setTheme: () => {},
       startLoading: () => {},
       stopLoading: () => {},
       confirmBooking: () => {},
       updateRideStatus: () => {},
       completeRide: () => {},
+      submitRating: () => {},
       resetBooking: () => {},
       addRecentDestination: () => {},
+      addCompletedRide: () => {},
       findRides: async () => [],
       processPayment: async () => true,
     } as BookingContextValue
   }
   return context
 }
+
+// Exported for testability (reducer + initial state are pure and valuable to verify directly)
+export { bookingReducer, initialState }
