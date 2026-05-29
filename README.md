@@ -148,6 +148,27 @@ Run `npm run lint && npm test && npm run build` locally before committing.
 
 ---
 
+## Deployment
+
+This project is automatically deployed to **GitHub Pages** using GitHub Actions.
+
+- Workflow: `.github/workflows/deploy.yml`
+- Live URL: https://xiaoqianran.github.io/figma-004/
+
+### How it works
+- On every push to `main`, the app is built and deployed.
+- Vite is configured with `base: '/figma-004/'` for correct asset paths.
+
+### Enable GitHub Pages (one-time setup)
+1. Go to your repository on GitHub
+2. Navigate to **Settings → Pages**
+3. Under "Build and deployment", set **Source** to **GitHub Actions**
+4. Save
+
+The next push to `main` will trigger the deployment.
+
+---
+
 Built as a demonstration of **design-to-code fidelity** and modern frontend engineering practices.
 
 Happy exploring — switch to Full App Flow and book a ride!
