@@ -16,10 +16,14 @@ High-fidelity React + TypeScript recreation of a premium **Figma Rideshare UI Ki
 
 **Figma 学习 004 - 参考 Rideshare UI Kit**
 
+https://xiaoqianran.github.io/figma-004/
+
 这是一个通过 Figma MCP 工具 + React 技术栈，对 Figma 中的 Rideshare UI Kit 进行高保真复刻的学习项目。
 
 - 项目地址（GitHub Pages）：https://xiaoqianran.github.io/figma-004/
 - 仓库地址：https://github.com/xiaoqianran/figma-004
+
+> 建议直接复制上面两行内容填入 GitHub 仓库的 About 区域（Description + Website）
 
 ## What This Is
 

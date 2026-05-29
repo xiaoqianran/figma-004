@@ -1,0 +1,19 @@
+=== GitHub 仓库 About 区域推荐内容 ===
+
+Description（仓库描述）:
+Figma 学习 004 - 参考 Rideshare UI Kit
+
+Website（网站链接）:
+https://xiaoqianran.github.io/figma-004/
+
+Topics（建议添加的标签）:
+figma, ui-kit, design-to-code, react, typescript, rideshare, high-fidelity, figma-to-code, vite, mcp, learning-project
+
+操作步骤：
+1. 打开 https://github.com/xiaoqianran/figma-004
+2. 点击右上角 Settings
+3. 左侧找到 General → 往下找到 About 区域
+4. 把上面的 Description 和 Website 填进去
+5. 在 Topics 里添加上面列出的标签
+
+这样仓库首页右边的 About 就会显示你想要的内容了。
