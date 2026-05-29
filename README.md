@@ -1,12 +1,25 @@
 # Rideshare UI Kit — React Replica
 
+**Figma 学习 004 - 参考 Rideshare UI Kit**
+
 High-fidelity React + TypeScript recreation of a premium **Figma Rideshare UI Kit** (iPhone 14 Pro flows). Built with Vite, Tailwind, Framer Motion, and Lucide icons. Screens and interactions were developed using MCP tools (Figma Model Context Protocol) for pixel-perfect translation from design to code.
+
+> **GitHub Pages**: https://xiaoqianran.github.io/figma-004/
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
 ![Tailwind](https://img.shields.io/badge/Tailwind-3-38B2AC?logo=tailwind-css)
 ![Vitest](https://img.shields.io/badge/Vitest-tested-6E9F18?logo=vitest)
+
+## About / 关于本项目
+
+**Figma 学习 004 - 参考 Rideshare UI Kit**
+
+这是一个通过 Figma MCP 工具 + React 技术栈，对 Figma 中的 Rideshare UI Kit 进行高保真复刻的学习项目。
+
+- 项目地址（GitHub Pages）：https://xiaoqianran.github.io/figma-004/
+- 仓库地址：https://github.com/xiaoqianran/figma-004
 
 ## What This Is
 
