@@ -1,191 +1,136 @@
-# Rideshare UI Kit — React Replica
+# Rideshare UI Kit - React 高保真复刻
 
 **Figma 学习 004 - 参考 Rideshare UI Kit**
 
-High-fidelity React + TypeScript recreation of a premium **Figma Rideshare UI Kit** (iPhone 14 Pro flows). Built with Vite, Tailwind, Framer Motion, and Lucide icons. Screens and interactions were developed using MCP tools (Figma Model Context Protocol) for pixel-perfect translation from design to code.
+这是一个基于 Figma Rideshare UI Kit 进行高保真复刻的学习项目，使用 React + TypeScript + Vite 技术栈完成。
 
-> **GitHub Pages**: https://xiaoqianran.github.io/figma-004/
+项目通过 Figma MCP 工具提取设计信息，并以极高的视觉还原度实现了移动端 UI 组件和完整交互流程。
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
-![Tailwind](https://img.shields.io/badge/Tailwind-3-38B2AC?logo=tailwind-css)
-![Vitest](https://img.shields.io/badge/Vitest-tested-6E9F18?logo=vitest)
-
-## About / 关于本项目
-
-**Figma 学习 004 - 参考 Rideshare UI Kit**
-
-https://xiaoqianran.github.io/figma-004/
-
-这是一个通过 Figma MCP 工具 + React 技术栈，对 Figma 中的 Rideshare UI Kit 进行高保真复刻的学习项目。
-
-- 项目地址（GitHub Pages）：https://xiaoqianran.github.io/figma-004/
+- 在线演示：https://xiaoqianran.github.io/figma-004/
 - 仓库地址：https://github.com/xiaoqianran/figma-004
 
-> 建议直接复制上面两行内容填入 GitHub 仓库的 About 区域（Description + Website）
+---
 
-## What This Is
+## 项目简介
 
-A production-quality **interactive replica** and **component gallery** of a modern rideshare mobile experience:
+本项目是对 Figma 中 **Rideshare UI Kit** 的完整复刻，目标是练习「从设计稿到高质量前端代码」的转化能力。
 
-- **Isolated high-fidelity screen previews** (gallery mode) — click any screen in the sidebar
-- **Full realistic App Flow** (toggle) — complete multi-step user journeys with global state, loading overlays, toasts, bottom navigation, and simulated API delays
-- Every major flow from the original Figma kit: onboarding, authentication, booking, payments, tracking, and secondary screens
+主要包含两种使用模式：
 
-**Key flows implemented:**
-- Splash (dark + light variants) → Create Account / Log In
-- Sign In + Create Account (form states, social auth buttons, validation toasts)
-- Destination selection (search + saved places + recents) → "Finding drivers" overlay → Car Results
-- Car selection → Payment processing (Add Card dark/light + Card Scan)
-- Full-app mode: Home/Map view, persistent Bottom Nav, Messages, Profile, Ride Tracking with live status progression, Settings (dark/light), Gift Code redeem, Rating & Tips keypad
-- Rich micro-interactions: animated toasts, progress overlays, spring transitions, dynamic island + home indicator in device frame
+- **Gallery 模式**：独立预览所有屏幕（适合组件级学习）
+- **Full App Flow 模式**：完整的 App 交互流程（支持全局状态、底部导航、真实用户旅程）
 
-The result feels like a real shipping product inside a device shell.
+项目内所有屏幕均基于 Figma 原始设计进行像素级还原，并添加了丰富的微交互和状态管理。
 
-## Screenshots & Visuals
+---
 
-The `references/` folder contains the original Figma design captures used as the source of truth:
+## 主要功能亮点
 
-- `splash-76-960.png`, `signin-65-904.png`, `signin-create-34-1612.png`
-- `destination-76-1261.png`, `car-result-76-2222.png`
-- `add-card-dark-76-988.png`, `add-card-light-1-2613.png`, `card-scan-dark-76-1064.png`
+- 高度还原的 iPhone 14 Pro 设备壳（含 Dynamic Island + Home Indicator）
+- 完整的用户流程：Splash → 登录/注册 → Home → 目的地选择 → 选车 → 支付 → 实时跟踪 → 评价
+- 全局状态管理（BookingContext），支持真实的多步交互
+- 丰富的动画与反馈：Framer Motion 转场、Toast 提示、加载遮罩、按钮按压效果
+- 设计系统（Design System）：Button、Input、Card、StatusBar、TopBar、RideCard 等可复用组件
+- 支付方式管理、通知开关、主题切换等功能页面
+- 支持 Google / Facebook 一键直接登录（模拟）
 
-**Generate your own visuals:**
-1. `npm run dev`
-2. Toggle between Gallery and "Full App Flow"
-3. Use browser devtools device emulation or screenshot the phone frame area
+---
 
-(Recommended: capture both light/dark variants and key states like "finding drivers" and ride tracking.)
+## 技术栈
 
-## Getting Started
+- React 18 + TypeScript
+- Vite
+- Tailwind CSS
+- Framer Motion（动画）
+- Lucide React（图标）
+- Vitest + React Testing Library（测试）
+- ESLint + Prettier（代码规范）
 
-### Prerequisites
-- Node.js 18+
-- npm (or pnpm/yarn)
+---
 
-### Install & Run
+## 本地运行
 
 ```bash
+# 安装依赖
 npm install
+
+# 启动开发服务器
 npm run dev
 ```
 
-Open http://localhost:5173 (or the port shown).
+访问 http://localhost:5173 即可查看。
 
-### Available Scripts
+### 常用命令
 
-| Command           | Description                              |
-|-------------------|------------------------------------------|
-| `npm run dev`     | Start Vite dev server with HMR           |
-| `npm run build`   | Type-check + production build            |
-| `npm run preview` | Preview the production build locally     |
-| `npm run lint`    | Run ESLint (zero warnings enforced)      |
-| `npm run lint:fix`| Auto-fix lint issues                     |
-| `npm run format`  | Format code with Prettier                |
-| `npm run test`    | Run Vitest smoke tests (CI mode)         |
-| `npm run test:watch` | Watch mode for tests                  |
+| 命令                    | 说明                          |
+|-------------------------|-------------------------------|
+| `npm run dev`           | 启动开发服务器                |
+| `npm run build`         | 生产环境构建                  |
+| `npm run preview`       | 本地预览生产构建              |
+| `npm run lint`          | 代码检查                      |
+| `npm run lint:fix`      | 自动修复 lint 问题            |
+| `npm run format`        | 使用 Prettier 格式化代码      |
+| `npm run test`          | 运行测试                      |
 
-## Architecture Notes
+---
+
+## GitHub Pages 自动部署
+
+本项目已配置 GitHub Actions，推送 `main` 分支后会自动部署到 GitHub Pages。
+
+部署地址：https://xiaoqianran.github.io/figma-004/
+
+部署流程文件位于：`.github/workflows/deploy.yml`
+
+---
+
+## 已实现的主要屏幕
+
+- Splash（深色/浅色）
+- 登录 / 注册页（含表单校验、社交登录）
+- Home（地图占位 + 快捷入口 + 车型选择）
+- 目的地选择页
+- 车辆结果列表（多种样式）
+- 订单确认页
+- 支付添加页（深色/浅色）+ 扫码支付页
+- 实时行程跟踪页（支持手动控制状态）
+- 评价与打赏页（含数字键盘）
+- 消息页、个人资料页、设置页、礼品码页等
+
+---
+
+## 项目结构
 
 ```
 src/
-├── App.tsx                 # Gallery + mode toggle + flow orchestration + BookingProvider
-├── main.tsx
+├── App.tsx                 # 入口，包含 Gallery 和 Full-Flow 两种模式
 ├── components/
-│   ├── PhoneFrame.tsx      # Device chrome, Dynamic Island, toast layer, overlay support
-│   ├── RideshareApp.tsx    # Full interactive app (auth + booking + bottom nav + state machine)
-│   ├── BottomNavBar.tsx
-│   └── ui/                 # Shared design system (Button, Input, CreditCard, StatusBar, etc.)
+│   ├── PhoneFrame.tsx      # 手机外壳 + Toast + Overlay
+│   ├── RideshareApp.tsx    # 完整 App 流程编排
+│   ├── ui/                 # 设计系统组件
+│   └── ...
 ├── context/
-│   └── BookingContext.tsx  # Global ride state, auth, payments, reducers, persistence
-├── screens/                # ~17 high-fidelity screens (many with variants)
-├── lib/utils.ts
-├── index.css               # Tailwind + custom phone frame + component primitives
-└── test/                   # Vitest + RTL setup + smoke tests
+│   └── BookingContext.tsx  # 全局状态管理
+├── screens/                # 所有页面组件
+└── ...
 ```
 
-- **Two modes in one shell**: Isolated screens (for design QA) vs. `RideshareApp` (for flow/integration QA)
-- Strong emphasis on **motion & polish** matching the Figma kit (springs, progress stages, realistic loading)
-- Design tokens live in Tailwind config + CSS custom properties
-- Context provides fake "API" helpers (`findRides`, `processPayment`) with realistic timing
-- All components are self-contained and prop-driven for easy extraction into a real product
+---
 
-**Tech decisions:**
-- Framer Motion for all meaningful animations
-- No external UI libs — everything hand-crafted to match Figma
-- TypeScript strict + no-explicit-any enforced via lint
-- Vitest + Testing Library for fast component smoke coverage
+## 关于本项目
 
-## Implemented Screens + Flows
+**Figma 学习 004 - 参考 Rideshare UI Kit**
 
-**Onboarding & Auth**
-- SplashScreen (dark/light)
-- SignInScreen (welcome + create account variants)
+本项目是我在学习 Figma 转代码过程中的第 004 个练习案例，目标是：
 
-**Booking**
-- DestinationScreen (search, saved places, recents)
-- CarResultScreen + CarResultV2Screen (multiple ride options)
-- BookingConfirmScreen, RideTrackingScreen (live status auto-advance)
+- 提升从设计稿中提取信息的能力
+- 练习使用设计系统构建可维护的前端代码
+- 实现接近真实 App 的完整交互体验
 
-**Payments**
-- AddCardScreen (dark + light)
-- CardScanScreen
-
-**Core App Experience (Full Flow mode)**
-- HomeScreen (map + quick rides + recent)
-- MessagesScreen + MessagesPage
-- ProfileScreen
-- SettingsPage (dark/light)
-- GiftCodePage
-- RatingAndTipsPage
-
-**Supporting**
-- Overlays, toasts, loading states, bottom navigation
-
-All primary CTAs are wired to realistic next-step behavior or demo toasts.
-
-## Tooling & Quality
-
-This project was given **strong engineering hygiene** as part of the Docs & Quality pass:
-
-- **ESLint + Prettier** (`.eslintrc.cjs`, `.prettierrc`) — strict, zero-warning policy in CI
-- **Vitest + @testing-library/react** — 5 smoke tests covering render + primary CTA clicks
-- **TypeScript** (strict mode, noUnused*, isolatedModules)
-- Clean `npm run build` (tsc + Vite)
-- `.gitignore`, `public/` folder, conventional scripts
-
-Run `npm run lint && npm test && npm run build` locally before committing.
-
-## Credits
-
-- **Original Design**: Figma Rideshare UI Kit (high-fidelity mobile flows)
-- **Implementation**: React replica authored via direct use of the [Figma MCP server](https://github.com/modelcontextprotocol/servers) (figma-mcp-go) for design context, node inspection, and visual fidelity
-- Additional polish, state management, and full-flow orchestration added to create a usable interactive showcase
+项目使用了 Figma MCP 工具辅助提取设计信息，力求在视觉和交互上达到高保真还原。
 
 ---
 
-## Deployment
+## License
 
-This project is automatically deployed to **GitHub Pages** using GitHub Actions.
-
-- Workflow: `.github/workflows/deploy.yml`
-- Live URL: https://xiaoqianran.github.io/figma-004/
-
-### How it works
-- On every push to `main`, the app is built and deployed.
-- Vite is configured with `base: '/figma-004/'` for correct asset paths.
-
-### Enable GitHub Pages (one-time setup)
-1. Go to your repository on GitHub
-2. Navigate to **Settings → Pages**
-3. Under "Build and deployment", set **Source** to **GitHub Actions**
-4. Save
-
-The next push to `main` will trigger the deployment.
-
----
-
-Built as a demonstration of **design-to-code fidelity** and modern frontend engineering practices.
-
-Happy exploring — switch to Full App Flow and book a ride!
+MIT
