@@ -5,27 +5,60 @@ interface GiftCodePageProps {
   onBack?: () => void
   variant?: 'light' | 'dark'
   showToast?: (message: string, type?: 'success' | 'error' | 'info') => void
+  onRedeem?: (code: string, amount: number) => void
 }
 
-export function GiftCodePage({ onBack, variant = 'dark' }: GiftCodePageProps) {
+export function GiftCodePage({ onBack, variant = 'dark', showToast, onRedeem }: GiftCodePageProps) {
   const isDark = variant === 'dark'
   const [code, setCode] = useState('RIDO20')
   const [redeemed, setRedeemed] = useState(false)
+  const [success, setSuccess] = useState<{ code: string; amount: number } | null>(null)
+
+  // Supported demo codes -> credit amounts (case-insensitive match on redeem)
+  const validCodes: Record<string, number> = {
+    'WELCOME20': 20,
+    'METEOR50': 50,
+    'RIDO20': 20,
+    'GIFT25': 25,
+    'SAVE10': 10,
+  }
 
   const bg = isDark ? '#121826' : '#f8fafc'
   const textColor = isDark ? '#f8fafc' : '#161a21'
   const muted = isDark ? '#c5c7d0' : '#6b7280'
   const inputBg = isDark ? '#1e293b' : '#f1f3f5'
+  const successGreen = '#16a34a'
 
   const handleRedeem = () => {
-    if (code.trim()) {
+    const trimmed = code.trim()
+    if (!trimmed) return
+
+    const upper = trimmed.toUpperCase()
+    const amount = validCodes[upper] || 0
+
+    if (amount > 0) {
       setRedeemed(true)
+      // Parent (RideshareApp or gallery) handles actual credit via context
+      onRedeem?.(upper, amount)
+
       setTimeout(() => {
-        alert(`Promo code "${code}" applied! $8 credit added to your account. (demo)`)
         setRedeemed(false)
+        setSuccess({ code: upper, amount })
         setCode('')
       }, 650)
+    } else {
+      const msg = `Invalid code "${upper}". Try: WELCOME20, METEOR50, RIDO20 or GIFT25`
+      if (showToast) {
+        showToast(msg, 'error')
+      } else {
+        alert(msg)
+      }
     }
+  }
+
+  const handleBackFromSuccess = () => {
+    setSuccess(null)
+    onBack?.()
   }
 
   return (
@@ -58,67 +91,108 @@ export function GiftCodePage({ onBack, variant = 'dark' }: GiftCodePageProps) {
           </p>
         </div>
 
-        {/* Input */}
-        <div className="mt-7">
-          <div 
-            className="rounded-2xl px-6 py-[18px] flex items-center"
-            style={{ backgroundColor: inputBg }}
-          >
-            <input 
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="Enter code"
-              className="flex-1 bg-transparent text-[21px] font-semibold outline-none tracking-[1.5px]"
-              style={{ color: textColor, fontFamily: 'Sen, system-ui, sans-serif' }}
-            />
-          </div>
-        </div>
-
-        {/* Big Gift Illustration */}
-        <div className="flex-1 flex items-center justify-center relative my-6">
-          <div className="relative w-[210px] h-[210px]">
-            {/* Background glow */}
-            <div className="absolute inset-6 rounded-full" style={{ background: isDark ? '#e4995f1f' : '#fef3e8' }} />
-
-            {/* Gift box illustration */}
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[138px] h-[118px]">
-              {/* Box body */}
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[118px] h-[78px] rounded-xl" style={{ backgroundColor: '#f0f0f0' }} />
-              {/* Lid */}
-              <div className="absolute bottom-[62px] left-1/2 -translate-x-1/2 w-[130px] h-[44px] rounded-xl" style={{ backgroundColor: '#f0f0f0' }} />
-
-              {/* Ribbon */}
-              <div className="absolute bottom-[18px] left-1/2 -translate-x-1/2 w-[20px] h-[78px] rounded" style={{ backgroundColor: '#ffac70' }} />
-              <div className="absolute bottom-[70px] left-1/2 -translate-x-1/2 w-[84px] h-[18px] rounded" style={{ backgroundColor: '#ffab6a' }} />
-
-              {/* Bow */}
-              <div className="absolute left-1/2 top-[28px] -translate-x-1/2 w-9 h-9 rounded-full" style={{ backgroundColor: '#ef624c' }} />
-              <div className="absolute left-[47%] top-[34px] w-[22px] h-[12px] rounded" style={{ backgroundColor: '#f87561' }} />
-
-              {/* Big $ sign */}
-              <div className="absolute -top-1 -left-2 text-[64px] font-semibold" style={{ color: isDark ? '#f8fafc' : '#121826', fontFamily: 'Poppins, system-ui, sans-serif' }}>$</div>
+        {/* Input (hidden / disabled in success state) */}
+        {!success && (
+          <div className="mt-7">
+            <div 
+              className="rounded-2xl px-6 py-[18px] flex items-center"
+              style={{ backgroundColor: inputBg }}
+            >
+              <input 
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                placeholder="Enter code"
+                disabled={redeemed}
+                className="flex-1 bg-transparent text-[21px] font-semibold outline-none tracking-[1.5px] disabled:opacity-70"
+                style={{ color: textColor, fontFamily: 'Sen, system-ui, sans-serif' }}
+              />
+            </div>
+            <div className="mt-2 text-[11px] px-1" style={{ color: muted }}>
+              Try: WELCOME20 • METEOR50 • RIDO20 • GIFT25
             </div>
           </div>
+        )}
+
+        {/* Big Gift Illustration OR Success state */}
+        <div className="flex-1 flex items-center justify-center relative my-6">
+          {success ? (
+            <div className="text-center px-4">
+              <div className="mx-auto mb-4 text-7xl">🎉</div>
+              <div className="text-[22px] font-semibold tracking-[-0.3px]" style={{ fontFamily: 'Sen, system-ui, sans-serif' }}>
+                Code redeemed!
+              </div>
+              <div className="mt-2 text-[18px] font-semibold" style={{ color: successGreen }}>
+                ${success.amount} added to your gift balance
+              </div>
+              <div className="mt-1.5 text-sm" style={{ color: muted }}>
+                Promo code <span className="font-mono">{success.code}</span> applied successfully
+              </div>
+              <div className="mt-4 text-xs px-3 py-1 rounded-full inline-block" style={{ backgroundColor: isDark ? '#1e293b' : '#f1f3f5', color: muted }}>
+                Balance updated in Profile &amp; Settings
+              </div>
+            </div>
+          ) : (
+            <div className="relative w-[210px] h-[210px]">
+              {/* Background glow */}
+              <div className="absolute inset-6 rounded-full" style={{ background: isDark ? '#e4995f1f' : '#fef3e8' }} />
+
+              {/* Gift box illustration */}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[138px] h-[118px]">
+                {/* Box body */}
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[118px] h-[78px] rounded-xl" style={{ backgroundColor: '#f0f0f0' }} />
+                {/* Lid */}
+                <div className="absolute bottom-[62px] left-1/2 -translate-x-1/2 w-[130px] h-[44px] rounded-xl" style={{ backgroundColor: '#f0f0f0' }} />
+
+                {/* Ribbon */}
+                <div className="absolute bottom-[18px] left-1/2 -translate-x-1/2 w-[20px] h-[78px] rounded" style={{ backgroundColor: '#ffac70' }} />
+                <div className="absolute bottom-[70px] left-1/2 -translate-x-1/2 w-[84px] h-[18px] rounded" style={{ backgroundColor: '#ffab6a' }} />
+
+                {/* Bow */}
+                <div className="absolute left-1/2 top-[28px] -translate-x-1/2 w-9 h-9 rounded-full" style={{ backgroundColor: '#ef624c' }} />
+                <div className="absolute left-[47%] top-[34px] w-[22px] h-[12px] rounded" style={{ backgroundColor: '#f87561' }} />
+
+                {/* Big $ sign */}
+                <div className="absolute -top-1 -left-2 text-[64px] font-semibold" style={{ color: isDark ? '#f8fafc' : '#121826', fontFamily: 'Poppins, system-ui, sans-serif' }}>$</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Bottom actions */}
       <div className="px-6 pb-8 pt-2">
-        <button 
-          onClick={handleRedeem}
-          disabled={!code.trim() || redeemed}
-          className="btn-primary w-full h-[54px] text-[17px] font-semibold disabled:opacity-60"
-        >
-          {redeemed ? 'Applying...' : 'Redeem Code'}
-        </button>
+        {success ? (
+          <button 
+            onClick={handleBackFromSuccess}
+            className="btn-primary w-full h-[54px] text-[17px] font-semibold"
+          >
+            Return to Settings
+          </button>
+        ) : (
+          <>
+            <button 
+              onClick={handleRedeem}
+              disabled={!code.trim() || redeemed}
+              className="btn-primary w-full h-[54px] text-[17px] font-semibold disabled:opacity-60"
+            >
+              {redeemed ? 'Applying...' : 'Redeem Code'}
+            </button>
 
-        <button 
-          onClick={() => alert('View supported gift codes & issues (demo)')}
-          className="w-full text-center mt-4 text-sm underline"
-          style={{ color: '#4c5df9' }}
-        >
-          View Supported issues
-        </button>
+            <button 
+              onClick={() => {
+                if (showToast) {
+                  showToast('Supported codes: WELCOME20 ($20), METEOR50 ($50), etc. (demo)', 'info')
+                } else {
+                  alert('Supported demo codes: WELCOME20, METEOR50, RIDO20, GIFT25 (demo)')
+                }
+              }}
+              className="w-full text-center mt-4 text-sm underline"
+              style={{ color: '#4c5df9' }}
+            >
+              View Supported codes
+            </button>
+          </>
+        )}
       </div>
     </div>
   )
