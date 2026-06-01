@@ -1,5 +1,6 @@
 
-import { ArrowLeft, ChevronRight, CreditCard as CreditCardIcon, Plus } from 'lucide-react'
+import React, { useState } from 'react'
+import { ArrowLeft, ChevronRight, CreditCard as CreditCardIcon, Plus, Gift, X } from 'lucide-react'
 import { useBooking, PaymentMethod } from '../context/BookingContext'
 
 interface SettingsPageProps {
@@ -8,6 +9,10 @@ interface SettingsPageProps {
   showToast?: (message: string, type?: 'success' | 'error' | 'info') => void
   onAddPayment?: () => void
   onViewHistory?: () => void
+  onOpenMessages?: () => void
+  onOpenGift?: () => void
+  onViewGift?: () => void
+  onShowHelp?: () => void
 }
 
 interface MenuItem {
@@ -15,12 +20,12 @@ interface MenuItem {
   label: string
   color: string
   bg: string
-  action?: 'payment' | 'history'
+  action?: 'payment' | 'history' | 'gift'
 }
 
-export function SettingsPage({ onBack, variant = 'dark', onAddPayment, onViewHistory }: SettingsPageProps) {
-  const { state, setPaymentMethod, setNotificationsEnabled, setTheme, updateUser } = useBooking()
-  const { user, paymentMethods, paymentMethod, preferences } = state
+export function SettingsPage({ onBack, variant = 'dark', onAddPayment, onViewHistory, showToast, onOpenMessages, onOpenGift, onViewGift, onShowHelp }: SettingsPageProps) {
+  const { state, setPaymentMethod, setNotificationsEnabled, setTheme, updateUser, addGiftBalance } = useBooking()
+  const { user, paymentMethods, paymentMethod, preferences, giftBalance = 0 } = state
 
   // Theme from context pref takes precedence so changing it affects this screen live
   const currentTheme = preferences?.theme || variant
@@ -33,6 +38,26 @@ export function SettingsPage({ onBack, variant = 'dark', onAddPayment, onViewHis
   const headerBg = isDark ? '#121826' : '#f8fafc'
 
   const notifEnabled = preferences?.notificationsEnabled ?? true
+
+  // Local demo state for sub-panels (isolated, no parent pollution)
+  const [activePanel, setActivePanel] = useState<'help' | 'gift' | null>(null)
+  const [giftCode, setGiftCode] = useState('RIDE20')
+  const [giftRedeemed, setGiftRedeemed] = useState(false)
+
+  const handleRedeemGift = () => {
+    if (!giftCode.trim()) return
+    const upper = giftCode.trim().toUpperCase()
+    // Reuse similar demo amounts as GiftCodePage for consistency
+    const amount = ({ 'WELCOME20': 20, 'METEOR50': 50, 'RIDO20': 20, 'GIFT25': 25, 'SAVE10': 10, 'RIDE20': 8, 'FIRST10': 10, 'SAFE20': 20, 'WEEKEND5': 5 } as Record<string, number>)[upper] || 8
+    setGiftRedeemed(true)
+    setTimeout(() => {
+      addGiftBalance?.(amount)
+      showToast?.(`Gift code "${upper}" redeemed! $${amount} credit added (demo)`, 'success')
+      setGiftRedeemed(false)
+      setGiftCode('')
+      setActivePanel(null)
+    }, 650)
+  }
 
   const menuItems: MenuItem[] = [
     { icon: <div className="w-6 h-6 text-white">👤</div>, label: 'My account', color: isDark ? '#f8fafc' : '#161a21', bg: isDark ? '#4c5df966' : '#4c5df9' },
@@ -94,6 +119,10 @@ export function SettingsPage({ onBack, variant = 'dark', onAddPayment, onViewHis
               >
                 Edit Account
               </button>
+              {/* Gift balance hint for polish (demo $0 or updated after redeem via GiftCodePage) */}
+              <div className={`text-[11px] font-medium mt-1 ${giftBalance > 0 ? 'text-amber-600' : 'text-gray-500'}`}>
+                🎁 Gift balance: ${giftBalance}
+              </div>
             </div>
           </div>
         </div>
@@ -171,74 +200,227 @@ export function SettingsPage({ onBack, variant = 'dark', onAddPayment, onViewHis
         >
           <Plus size={16} /> Add new card or method
         </button>
+
+        {/* Delightful quick action: Redeem Gift Code near payments */}
+        <button
+          onClick={() => setActivePanel('gift')}
+          className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-sm font-medium active:opacity-90 transition-all"
+          style={{ backgroundColor: isDark ? '#1e293b' : '#fef3e8', color: isDark ? '#f8fafc' : '#c2410f', border: `1px solid ${isDark ? '#334155' : '#fed7aa'}` }}
+        >
+          <Gift size={15} /> Redeem Gift Code or Promo
+        </button>
       </div>
 
-      {/* Menu List */}
-      <div className="flex-1 px-5 pt-2 pb-8 overflow-y-auto space-y-2.5">
-        {menuItems.map((item, index) => (
-          <button
-            key={index}
-            onClick={() => {
-              if (item.label === 'Payment Card' || item.label === 'My account') {
-                onAddPayment?.()
-              } else if (item.label === 'Trip History' || (item as { action?: string }).action === 'history') {
-                onViewHistory?.()
-              } else {
-                // graceful demo for other items (no console in production path)
-              }
-            }}
-            className="w-full flex items-center gap-4 px-4 py-[15px] rounded-2xl active:opacity-90 transition-all"
-            style={{ 
-              backgroundColor: cardBg, 
-              border: `1px solid ${cardBorder}` 
-            }}
-          >
-            <div 
-              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: item.bg }}
-            >
-              {item.icon}
-            </div>
-            <div className="flex-1 text-left">
-              <div 
-                className="font-semibold text-[16px] tracking-[-0.2px]"
-                style={{ color: item.color, fontFamily: 'Sen, system-ui, sans-serif' }}
-              >
-                {item.label}
+      {/* Menu List or Active Sub-Panel (help/gift for delightful non-dead-end UX) */}
+      <div className="flex-1 px-5 pt-2 pb-8 overflow-y-auto">
+        {activePanel ? (
+          /* Sub panel content - light DOM state, self contained */
+          <div className="space-y-4">
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-1">
+              <div className="font-semibold text-lg tracking-[-0.3px]" style={{ fontFamily: 'Sen, system-ui, sans-serif' }}>
+                {activePanel === 'help' ? 'Help & Support' : 'Redeem Gift Code'}
               </div>
+              <button 
+                onClick={() => setActivePanel(null)} 
+                className="w-9 h-9 rounded-xl flex items-center justify-center active:bg-black/5"
+                style={{ color: isDark ? '#9fa1b0' : '#6b7280' }}
+              >
+                <X size={20} />
+              </button>
             </div>
-            <ChevronRight size={18} style={{ color: isDark ? '#9fa1b0' : '#9fa1b0' }} />
-          </button>
-        ))}
 
-        {/* Extra interactive toggle for notifications */}
-        <div 
-          className="w-full flex items-center gap-4 px-4 py-[15px] rounded-2xl mt-1"
-          style={{ 
-            backgroundColor: cardBg, 
-            border: `1px solid ${cardBorder}` 
-          }}
-        >
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-[#4c5df9]">
-            <span className="text-white text-lg">🔔</span>
+            {activePanel === 'gift' && (
+              <>
+                <div className="rounded-3xl p-5 space-y-4" style={{ backgroundColor: cardBg, border: `1px solid ${cardBorder}` }}>
+                  <div className="text-sm" style={{ color: isDark ? '#c5c7d0' : '#475569' }}>
+                    Enter a gift card or promo code to add balance to your account instantly.
+                  </div>
+                  <div 
+                    className="rounded-2xl px-4 py-3 flex items-center"
+                    style={{ backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }}
+                  >
+                    <Gift size={18} style={{ color: isDark ? '#a5b4fc' : '#c2410f' }} className="mr-3" />
+                    <input 
+                      value={giftCode}
+                      onChange={(e) => setGiftCode(e.target.value.toUpperCase())}
+                      placeholder="Enter code e.g. RIDE20"
+                      className="flex-1 bg-transparent text-[17px] font-semibold outline-none tracking-[1.2px]"
+                      style={{ color: textColor, fontFamily: 'Sen, system-ui, sans-serif' }}
+                    />
+                  </div>
+                  <button
+                    onClick={handleRedeemGift}
+                    disabled={!giftCode.trim() || giftRedeemed}
+                    className="w-full py-3.5 rounded-2xl text-sm font-semibold transition active:opacity-90 disabled:opacity-60"
+                    style={{ backgroundColor: '#4c5df9', color: '#fff' }}
+                  >
+                    {giftRedeemed ? 'Applying credit...' : 'Redeem & Add to Balance'}
+                  </button>
+                </div>
+
+                {/* Suggested codes / info */}
+                <div className="px-1 text-xs uppercase tracking-widest font-medium mb-1.5" style={{ color: isDark ? '#9fa1b0' : '#6b7280' }}>
+                  POPULAR PROMOS
+                </div>
+                {['FIRST10', 'SAFE20', 'WEEKEND5'].map((code) => (
+                  <button 
+                    key={code} 
+                    onClick={() => { setGiftCode(code); showToast?.(`Code ${code} ready — tap Redeem`, 'info') }}
+                    className="w-full text-left px-4 py-3 rounded-2xl flex items-center justify-between active:opacity-90 text-sm"
+                    style={{ backgroundColor: cardBg, border: `1px solid ${cardBorder}` }}
+                  >
+                    <span style={{ fontFamily: 'monospace' }}>{code}</span>
+                    <span style={{ color: '#4c5df9' }}>Use →</span>
+                  </button>
+                ))}
+                <div className="text-[11px] px-1 pt-1" style={{ color: isDark ? '#64748b' : '#94a3b8' }}>
+                  Credits apply to next ride. Terms apply (demo).
+                </div>
+              </>
+            )}
+
+            {activePanel === 'help' && (
+              <>
+                {/* Quick actions */}
+                <div className="grid grid-cols-1 gap-2">
+                  <button 
+                    onClick={() => { 
+                      showToast?.('Support ticket #4821 created (demo). We\'ll reply in ~2h.', 'success') 
+                      setActivePanel(null) 
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl active:opacity-90 text-left"
+                    style={{ backgroundColor: cardBg, border: `1px solid ${cardBorder}` }}
+                  >
+                    <div className="text-xl">💬</div>
+                    <div className="flex-1">
+                      <div className="font-semibold text-[15px]">Contact support</div>
+                      <div className="text-xs" style={{ color: isDark ? '#9fa1b0' : '#64748b' }}>Chat or email our team</div>
+                    </div>
+                  </button>
+                  <button 
+                    onClick={() => showToast?.('Safety tips sent to your email (demo)', 'info')}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl active:opacity-90 text-left"
+                    style={{ backgroundColor: cardBg, border: `1px solid ${cardBorder}` }}
+                  >
+                    <div className="text-xl">🛡️</div>
+                    <div className="flex-1">
+                      <div className="font-semibold text-[15px]">Safety tips</div>
+                      <div className="text-xs" style={{ color: isDark ? '#9fa1b0' : '#64748b' }}>Latest rider safety guidelines</div>
+                    </div>
+                  </button>
+                </div>
+
+                {/* FAQ */}
+                <div className="px-1 text-xs uppercase tracking-widest font-medium mt-3 mb-1.5" style={{ color: isDark ? '#9fa1b0' : '#6b7280' }}>
+                  FREQUENTLY ASKED
+                </div>
+                {[
+                  { q: 'How do I cancel a ride?', a: 'Tap the ride in progress > Cancel (free if >5min before arrival).' },
+                  { q: 'Where is my receipt?', a: 'Trip History > select ride > Download PDF or email.' },
+                  { q: 'Can I share my trip?', a: 'Yes — enable "Share trip status" in Privacy & Safety from Profile.' },
+                  { q: 'Lost item?', a: 'Use Help > Contact support with booking ID.' },
+                ].map((faq, i) => (
+                  <div key={i} className="px-4 py-3 rounded-2xl text-sm" style={{ backgroundColor: cardBg, border: `1px solid ${cardBorder}` }}>
+                    <div className="font-semibold">{faq.q}</div>
+                    <div className="mt-1 text-xs leading-snug" style={{ color: isDark ? '#c5c7d0' : '#475569' }}>{faq.a}</div>
+                  </div>
+                ))}
+
+                {/* App info */}
+                <div className="mt-4 px-4 py-3 rounded-2xl text-center text-xs" style={{ backgroundColor: isDark ? '#1e293b' : '#f1f5f9', color: isDark ? '#9fa1b0' : '#64748b' }}>
+                  Meteor Rideshare v4.2.1 • Build 1284<br />
+                  San Francisco, CA • Last updated today
+                </div>
+              </>
+            )}
           </div>
-          <div className="flex-1 text-left">
+        ) : (
+          <div className="space-y-2.5">
+            {menuItems.map((item, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  if (item.label === 'Payment Card' || item.label === 'My account') {
+                    onAddPayment?.()
+                  } else if (item.label === 'Trip History' || (item as { action?: string }).action === 'history') {
+                    onViewHistory?.()
+                  } else if (item.label === 'Gift Cards') {
+                    // Prefer navigation callback (integrates GiftCodePage in full flow / gallery)
+                    // Falls back to inline panel only if no callback wired
+                    if (onOpenGift || onViewGift) {
+                      ;(onViewGift || onOpenGift)?.()
+                    } else {
+                      setActivePanel('gift')
+                    }
+                  } else if (item.label === 'Message') {
+                    if (onOpenMessages) onOpenMessages()
+                    else showToast?.('Opening messages...', 'info')
+                  } else if (item.label === 'My Trips') {
+                    onViewHistory?.()
+                  } else if (item.label === 'Help') {
+                    onShowHelp?.()
+                    setActivePanel('help')
+                  } else if (item.label === 'Setting') {
+                    showToast?.('You are already in Settings', 'info')
+                  } else {
+                    showToast?.(`${item.label} opened (demo)`, 'info')
+                  }
+                }}
+                className="w-full flex items-center gap-4 px-4 py-[15px] rounded-2xl active:opacity-90 transition-all"
+                style={{ 
+                  backgroundColor: cardBg, 
+                  border: `1px solid ${cardBorder}` 
+                }}
+              >
+                <div 
+                  className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: item.bg }}
+                >
+                  {item.icon}
+                </div>
+                <div className="flex-1 text-left">
+                  <div 
+                    className="font-semibold text-[16px] tracking-[-0.2px]"
+                    style={{ color: item.color, fontFamily: 'Sen, system-ui, sans-serif' }}
+                  >
+                    {item.label}
+                  </div>
+                </div>
+                <ChevronRight size={18} style={{ color: isDark ? '#9fa1b0' : '#9fa1b0' }} />
+              </button>
+            ))}
+
+            {/* Extra interactive toggle for notifications */}
             <div 
-              className="font-semibold text-[16px] tracking-[-0.2px]"
-              style={{ color: textColor, fontFamily: 'Sen, system-ui, sans-serif' }}
+              className="w-full flex items-center gap-4 px-4 py-[15px] rounded-2xl mt-1"
+              style={{ 
+                backgroundColor: cardBg, 
+                border: `1px solid ${cardBorder}` 
+              }}
             >
-              Notifications
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-[#4c5df9]">
+                <span className="text-white text-lg">🔔</span>
+              </div>
+              <div className="flex-1 text-left">
+                <div 
+                  className="font-semibold text-[16px] tracking-[-0.2px]"
+                  style={{ color: textColor, fontFamily: 'Sen, system-ui, sans-serif' }}
+                >
+                  Notifications
+                </div>
+              </div>
+              <button
+                onClick={() => setNotificationsEnabled(!notifEnabled)}
+                className={`w-11 h-6 rounded-full transition-all relative ${notifEnabled ? 'bg-[#4c5df9]' : (isDark ? 'bg-[#334155]' : 'bg-gray-300')}`}
+              >
+                <div 
+                  className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${notifEnabled ? 'right-0.5' : 'left-0.5'}`} 
+                />
+              </button>
             </div>
           </div>
-          <button
-            onClick={() => setNotificationsEnabled(!notifEnabled)}
-            className={`w-11 h-6 rounded-full transition-all relative ${notifEnabled ? 'bg-[#4c5df9]' : (isDark ? 'bg-[#334155]' : 'bg-gray-300')}`}
-          >
-            <div 
-              className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${notifEnabled ? 'right-0.5' : 'left-0.5'}`} 
-            />
-          </button>
-        </div>
+        )}
       </div>
     </div>
   )

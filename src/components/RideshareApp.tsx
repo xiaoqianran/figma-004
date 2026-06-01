@@ -18,6 +18,7 @@ import { ProfileScreen } from '../screens/ProfileScreen'
 import { SettingsPage } from '../screens/SettingsPage'
 import { RatingAndTipsPage } from '../screens/RatingAndTipsPage'
 import { RideHistoryScreen } from '../screens/RideHistoryScreen'
+import { GiftCodePage } from '../screens/GiftCodePage'
 import { BottomNavBar, NavTab } from './BottomNavBar'
 
 // Main views for the integrated experience
@@ -33,6 +34,7 @@ type AppView =
   | 'ride-tracking'
   | 'rating'
   | 'history'
+  | 'gift'
 
 interface RideshareAppProps {
   initialView?: AppView
@@ -43,6 +45,13 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
   const [navTab, setNavTab] = useState<NavTab>('home')
   const [, setPendingDestination] = useState<Location | null>(null)
   const [profileView, setProfileView] = useState<'main' | 'settings'>('main')
+  const [appToast, setAppToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+
+  // Local toast fn defined early so all later handlers can reference safely
+  const showToastInApp = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setAppToast({ message, type })
+    setTimeout(() => setAppToast(null), 2650)
+  }
 
   const { 
     state, 
@@ -57,6 +66,8 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
     completeRide,
     resetBooking,
     submitRating,
+    rebookRide,
+    addGiftBalance,
   } = useBooking()
 
   const isAuthenticated = state.isAuthenticated
@@ -77,7 +88,7 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
       setCurrentView(prev)
     } else {
       // Sensible fallbacks
-      if (['destination', 'car-results', 'booking-confirm', 'add-payment', 'rating'].includes(currentView)) {
+      if (['destination', 'car-results', 'booking-confirm', 'add-payment', 'rating', 'history', 'gift'].includes(currentView)) {
         setCurrentView('home')
         setNavTab('home')
       } else if (['signin-welcome', 'signin-create'].includes(currentView)) {
@@ -184,6 +195,62 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
     setViewHistory([])
   }
 
+  // Gift code flow (integrates GiftCodePage)
+  const handleOpenGiftCode = () => {
+    navigateTo('gift')
+  }
+
+  const handleGiftRedeem = (code: string, amount: number) => {
+    addGiftBalance(amount)
+    // Local toast for full-flow feedback (GiftCodePage also shows its own success panel)
+    showToastInApp(`Code ${code} redeemed! $${amount} added to wallet`, 'success')
+  }
+
+  // Quick Rebook handler: pre-populates via context, toasts, preselects ride, navigates to car-results
+  const handleRebook = async (ride: {
+    bookingId: string
+    rideName: string
+    price: number
+    destination: string
+    completedAt: string
+    rating?: number
+    tip?: number
+  }) => {
+    if (!ride?.destination) return
+
+    // 1. Prefill destination (and recent + preferred type) via context helper
+    rebookRide(ride)
+
+    // 2. Toast feedback (emerald style success action)
+    showToastInApp('Ride details loaded, finding similar options...')
+
+    // 3. Pre-select a matching ride option for instant quick-start (uses same catalog as CarResultScreen)
+    const name = (ride.rideName || '').toLowerCase()
+    let preselect: RideOption | null = null
+    if (name.includes('tesla') || name.includes('model 3')) {
+      preselect = { id: 101, name: 'Tesla Model 3', type: 'Electric', price: 12.4, priceDisplay: '$12.40', eta: '3 min', rating: 4.98, seats: 4 }
+    } else if (name.includes('camry') || name.includes('toyota')) {
+      preselect = { id: 102, name: 'Toyota Camry', type: 'Comfort', price: 8.9, priceDisplay: '$8.90', eta: '5 min', rating: 4.85, seats: 4 }
+    } else if (name.includes('cr-v') || name.includes('honda') || name.includes('suv')) {
+      preselect = { id: 103, name: 'Honda CR-V', type: 'SUV', price: 14.2, priceDisplay: '$14.20', eta: '7 min', rating: 4.91, seats: 5 }
+    } else if (name.includes('bmw') || name.includes('premium')) {
+      preselect = { id: 104, name: 'BMW 330i', type: 'Premium', price: 18.75, priceDisplay: '$18.75', eta: '4 min', rating: 4.95, seats: 4 }
+    }
+    if (preselect) {
+      selectRide(preselect)
+    }
+
+    // 4. Jump directly into results with prefilled data (natural flow continuation)
+    navigateTo('car-results')
+
+    // 5. Kick off findRides (mirrors normal flow; shows context loading overlay briefly)
+    try {
+      await findRides({ address: ride.destination })
+    } catch {
+      // demo only
+    }
+  }
+
   // Bottom nav handler (only meaningful on main screens)
   const handleTabChange = (tab: NavTab) => {
     setNavTab(tab)
@@ -199,6 +266,27 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
       setCurrentView('home') // Profile rendered as overlay when tab active
       setProfileView('main')
     }
+  }
+
+  // Callbacks for Settings/Profile menu items (drilled to enable Messages shortcut, Gift, Help flows)
+  const handleOpenMessagesFromSettings = () => {
+    setNavTab('messages')
+    // profile overlay auto-closes because showProfile depends on navTab
+  }
+
+  const handleOpenGiftFromSettings = () => {
+    // Fully navigate to dedicated GiftCodePage (light variant) - clears the profile overlay naturally via view change
+    handleOpenGiftCode()
+  }
+
+  const handleShowHelpFromSettings = () => {
+    // Help panel is self-contained inside SettingsPage; just a hint toast
+    showToastInApp('Help center: see FAQ + support actions inside the Help panel')
+  }
+
+  // showToast adapter for components that expect the typed signature (uses existing app toast layer)
+  const showToast = (message: string, type?: 'success' | 'error' | 'info') => {
+    showToastInApp(message, type || 'info')
   }
 
   // Loading overlay (inlined to avoid defining component inside render)
@@ -249,7 +337,7 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
         <div className="relative h-full flex flex-col">
           <HomeScreen 
             onSearchDestination={handleOpenDestination}
-            onQuickDestination={(loc: { label?: string; sub?: string; address?: string } | string) => handleDestinationConfirmed({ address: (typeof loc === 'string' ? loc : (loc?.label || loc?.address || 'Selected Place')), subtitle: (typeof loc === 'object' && loc ? loc.sub : undefined) })}
+            onQuickDestination={(loc: { label?: string; sub?: string; subtitle?: string; address?: string } | string) => handleDestinationConfirmed({ address: (typeof loc === 'string' ? loc : (loc?.label || loc?.address || 'Selected Place')), subtitle: (typeof loc === 'object' && loc ? (loc.sub || loc.subtitle) : undefined) })}
             onViewActiveRide={() => setCurrentView('ride-tracking')}
           />
 
@@ -262,7 +350,10 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
                 exit={{ opacity: 0 }}
                 className="absolute inset-0 bg-[#f8fafc] z-40"
               >
-                <MessagesScreen onBack={() => { setNavTab('home'); setCurrentView('home') }} />
+                <MessagesScreen 
+                  onBack={() => { setNavTab('home'); setCurrentView('home') }} 
+                  showToast={showToast} 
+                />
               </motion.div>
             )}
             {showProfile && (
@@ -287,6 +378,8 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
                       setViewHistory([])
                       setProfileView('main')
                     }}
+                    showToast={showToast}
+                    onOpenMessages={handleOpenMessagesFromSettings}
                   />
                 ) : (
                   <SettingsPage 
@@ -297,6 +390,10 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
                       navigateTo('add-payment')
                     }}
                     onViewHistory={() => navigateTo('history')}
+                    showToast={showToast}
+                    onOpenMessages={handleOpenMessagesFromSettings}
+                    onOpenGift={handleOpenGiftFromSettings}
+                    onShowHelp={handleShowHelpFromSettings}
                   />
                 )}
               </motion.div>
@@ -396,6 +493,18 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
       return (
         <RideHistoryScreen 
           onBack={goBack}
+          onRebook={handleRebook}
+        />
+      )
+    }
+
+    if (currentView === 'gift') {
+      return (
+        <GiftCodePage 
+          variant="light" 
+          onBack={goBack} 
+          showToast={showToast}
+          onRedeem={handleGiftRedeem}
         />
       )
     }
@@ -406,6 +515,26 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-white">
+      {/* Full-flow local toast layer (for rebook feedback etc; mirrors PhoneFrame toast style/pos, now typed) */}
+      <AnimatePresence>
+        {appToast && (
+          <motion.div
+            key="app-toast"
+            className={`absolute top-12 left-4 right-4 z-[85] px-4 py-3 rounded-2xl text-sm font-medium shadow-xl text-center pointer-events-none ${
+              appToast.type === 'success' ? 'bg-emerald-600 text-white' : 
+              appToast.type === 'error' ? 'bg-red-600 text-white' : 
+              'bg-[#1c1f2a] text-white'
+            }`}
+            initial={{ opacity: 0, y: -18, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 28, mass: 0.8 }}
+          >
+            {appToast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence mode="wait">
         <motion.div
           key={currentView + (isAuthenticated ? '-auth' : '')}

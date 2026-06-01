@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ArrowLeft, Settings, CreditCard, Bell, Shield, LogOut, ChevronRight, Pencil, X, Check } from 'lucide-react'
+import { ArrowLeft, Settings, CreditCard, Bell, Shield, LogOut, ChevronRight, Pencil, X, Check, Users, Lock, Download, Share2 } from 'lucide-react'
 import { useBooking } from '../context/BookingContext'
 import { StatusBar } from '../components/ui/StatusBar'
 import { Card } from '../components/ui/Card'
@@ -10,15 +10,21 @@ interface ProfileScreenProps {
   onLogout?: () => void
   onViewActiveRide?: () => void
   onOpenSettings?: () => void
+  showToast?: (message: string, type?: 'success' | 'error' | 'info') => void
+  onOpenMessages?: () => void
 }
 
-export function ProfileScreen({ onBack, onManagePayments, onLogout, onViewActiveRide, onOpenSettings }: ProfileScreenProps) {
-  const { state, logout, updateUser } = useBooking()
-  const { user, paymentMethod, activeRide, preferences } = state
+export function ProfileScreen({ onBack, onManagePayments, onLogout, onViewActiveRide, onOpenSettings, showToast, onOpenMessages: _onOpenMessages }: ProfileScreenProps) {
+  const { state, logout, updateUser, setNotificationsEnabled } = useBooking()
+  const { user, paymentMethod, activeRide, preferences, giftBalance = 0 } = state
 
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(user?.name || '')
   const [editEmail, setEditEmail] = useState(user?.email || '')
+
+  // Local demo state for privacy panel + toggles (isolated, no reducer needed)
+  const [showPrivacy, setShowPrivacy] = useState(false)
+  const [shareTripStatus, setShareTripStatus] = useState(true)
 
   const handleLogout = () => {
     logout()
@@ -47,8 +53,13 @@ export function ProfileScreen({ onBack, onManagePayments, onLogout, onViewActive
   const notifValue = preferences?.notificationsEnabled ? 'On' : 'Off'
   const menuItems = [
     { icon: CreditCard, label: 'Payment methods', action: onManagePayments, value: paymentMethod ? `${paymentMethod.brand} •••• ${paymentMethod.last4}` : 'Add card' },
-    { icon: Bell, label: 'Notifications', value: notifValue },
-    { icon: Shield, label: 'Privacy & Safety' },
+    { icon: Bell, label: 'Notifications', action: () => {
+        const curr = preferences?.notificationsEnabled ?? true
+        const next = !curr
+        setNotificationsEnabled(next)
+        showToast?.(`Notifications ${next ? 'enabled' : 'muted'}`, 'success')
+      }, value: notifValue },
+    { icon: Shield, label: 'Privacy & Safety', action: () => setShowPrivacy(true) },
     { icon: Settings, label: 'App settings', action: onOpenSettings },
   ]
 
@@ -82,6 +93,10 @@ export function ProfileScreen({ onBack, onManagePayments, onLogout, onViewActive
           <div className="text-gray-500 text-sm truncate">{user?.email || 'user@meteor.app'}</div>
           <div className="text-emerald-600 text-xs font-medium mt-0.5 flex items-center gap-1">
             ★ 4.92 • 148 rides
+          </div>
+          {/* Gift balance hint (updates live after redeeming in GiftCodePage flow) */}
+          <div className={`text-xs font-medium mt-0.5 flex items-center gap-1 ${giftBalance > 0 ? 'text-amber-600' : 'text-gray-500'}`}>
+            🎁 Gift balance: ${giftBalance}
           </div>
         </div>
       </button>
@@ -197,6 +212,107 @@ export function ProfileScreen({ onBack, onManagePayments, onLogout, onViewActive
           <span>Log out</span>
         </button>
       </div>
+
+      {/* Privacy & Safety panel - high quality demo content, opens on tap, uses local state + context for toggles */}
+      {showPrivacy && (
+        <div className="px-4 mt-3 mb-2">
+          <Card variant="elevated" padding="md" className="border-[#e0e7ff] bg-white">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Shield size={18} className="text-[#4c5df9]" />
+                <span className="font-semibold text-[16px] text-[#1c1f2a]">Privacy & Safety</span>
+              </div>
+              <button onClick={() => setShowPrivacy(false)} className="text-gray-400 active:text-gray-600 p-1"><X size={18} /></button>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              {/* Share trip toggle - uses local demo state */}
+              <div className="flex items-center justify-between py-1 px-1 rounded-xl bg-[#f8fafc]">
+                <div className="flex items-center gap-3">
+                  <Share2 size={18} className="text-emerald-600" />
+                  <div>
+                    <div className="font-medium text-[#1c1f2a]">Share trip status</div>
+                    <div className="text-[11px] text-gray-500">Send live updates to emergency contacts</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    const next = !shareTripStatus
+                    setShareTripStatus(next)
+                    showToast?.(`Trip sharing ${next ? 'enabled' : 'disabled'}`, 'success')
+                  }}
+                  className={`w-11 h-6 rounded-full transition-all relative ${shareTripStatus ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                >
+                  <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${shareTripStatus ? 'right-0.5' : 'left-0.5'}`} />
+                </button>
+              </div>
+
+              {/* Other privacy info rows */}
+              <div className="flex items-center gap-3 py-1 px-1">
+                <Lock size={18} className="text-[#4c5df9]" />
+                <div className="flex-1">
+                  <div className="font-medium text-[#1c1f2a]">Two-factor authentication</div>
+                  <div className="text-xs text-emerald-600">Enabled • SMS + app</div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium">ON</span>
+              </div>
+
+              <div className="flex items-center gap-3 py-1 px-1">
+                <Users size={18} className="text-[#4c5df9]" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-[#1c1f2a]">Ride sharing data</div>
+                  <div className="text-xs text-gray-500">Used for matching & safety only</div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full font-medium">ON</span>
+              </div>
+
+              <div className="flex items-center gap-3 py-1 px-1">
+                <div className="text-lg">📍</div>
+                <div className="flex-1">
+                  <div className="font-medium text-[#1c1f2a]">Location & trip history</div>
+                  <div className="text-xs text-gray-500">Auto-deletes after 90 days</div>
+                </div>
+              </div>
+
+              {/* Emergency contacts */}
+              <div className="pt-1 border-t border-gray-100">
+                <div className="text-[11px] uppercase tracking-widest text-gray-500 px-1 mb-1.5">EMERGENCY CONTACTS</div>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between items-center bg-[#f8fafc] px-3 py-2 rounded-xl">
+                    <span>Jamie P. (sister) • +1 (415) 555-0192</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-[#f8fafc] px-3 py-2 rounded-xl">
+                    <span>Sam K. (roommate) • +1 (650) 555-4411</span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => showToast?.('Emergency contacts manager opened (demo)', 'info')}
+                  className="mt-2 text-xs w-full py-2 text-[#4c5df9] font-medium active:bg-[#f0f4ff] rounded-xl"
+                >
+                  + Manage contacts or add new
+                </button>
+              </div>
+
+              {/* Data actions */}
+              <div className="pt-2 flex gap-2">
+                <button 
+                  onClick={() => { showToast?.('Your data export is being prepared (demo) — check email in 5min', 'success') }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-gray-200 rounded-2xl active:bg-gray-50"
+                >
+                  <Download size={14} /> Download data
+                </button>
+                <button 
+                  onClick={() => { showToast?.('Data deletion request logged. Account will be anonymized in 30d.', 'info') }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-red-200 text-red-600 rounded-2xl active:bg-red-50"
+                >
+                  Delete my data
+                </button>
+              </div>
+            </div>
+            <div className="text-center text-[10px] text-gray-400 mt-3">Your privacy matters. Learn more in Help.</div>
+          </Card>
+        </div>
+      )}
 
       <div className="text-center text-[10px] text-gray-400 pb-6">Meteor v4.2.1 • San Francisco</div>
     </div>
