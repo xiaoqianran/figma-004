@@ -48,8 +48,9 @@ describe('Smoke Tests - Rideshare UI Kit Screens', () => {
 
     expect(screen.getByText(/Where do you want to go/i)).toBeInTheDocument()
     expect(screen.getByPlaceholderText(/Search destination/i)).toBeInTheDocument()
-    expect(screen.getByText('Home')).toBeInTheDocument()
-    expect(screen.getByText('Work')).toBeInTheDocument()
+    // Home/Work appear in both SAVED and (now dynamic) RECENT sections from context initialState; use All to tolerate
+    expect(screen.getAllByText('Home').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('Work').length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders CarResultScreen with ride options and primary CTA', () => {

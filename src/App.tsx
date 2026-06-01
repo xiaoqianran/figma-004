@@ -309,9 +309,9 @@ export default function App() {
         )
       
       case 'settings-dark':
-        return <SettingsPage variant="dark" onBack={() => setCurrentScreen('home')} onViewHistory={() => setCurrentScreen('ride-history')} onAddPayment={() => setCurrentScreen('add-card-dark')} />
+        return <SettingsPage variant="dark" onBack={() => setCurrentScreen('home')} onViewHistory={() => setCurrentScreen('ride-history')} onAddPayment={() => setCurrentScreen('add-card-dark')} onOpenGift={() => setCurrentScreen('gift-code')} onViewGift={() => setCurrentScreen('gift-code')} />
       case 'settings-light':
-        return <SettingsPage variant="light" onBack={() => setCurrentScreen('home')} onViewHistory={() => setCurrentScreen('ride-history')} onAddPayment={() => setCurrentScreen('add-card-light')} />
+        return <SettingsPage variant="light" onBack={() => setCurrentScreen('home')} onViewHistory={() => setCurrentScreen('ride-history')} onAddPayment={() => setCurrentScreen('add-card-light')} onOpenGift={() => setCurrentScreen('gift-code')} onViewGift={() => setCurrentScreen('gift-code')} />
       
       case 'rating-tips':
         return <RatingAndTipsPage variant="dark" onBack={() => setCurrentScreen('home')} />
@@ -320,7 +320,7 @@ export default function App() {
         return <MessagesPage variant="dark" onBack={() => setCurrentScreen('home')} />
       
       case 'gift-code':
-        return <GiftCodePage variant="dark" onBack={() => setCurrentScreen('home')} />
+        return <GiftCodePage variant="dark" onBack={() => setCurrentScreen('home')} showToast={showToast} onRedeem={(_code, _amount) => { /* gallery isolated demo uses internal */ }} />
       
       case 'car-result-v2':
         return <CarResultV2Screen onBack={() => setCurrentScreen('home')} />
@@ -350,7 +350,17 @@ export default function App() {
         return <MessagesScreen onBack={() => setCurrentScreen('home')} />
       
       case 'ride-history':
-        return <RideHistoryScreen onBack={() => setCurrentScreen('home')} {...commonToast} />
+        return (
+          <RideHistoryScreen 
+            onBack={() => setCurrentScreen('home')} 
+            {...commonToast} 
+            onRebook={(_ride) => {
+              // Gallery mode: toast + quick nav to car results (full rebook prefill + flow is in RideshareApp full-flow)
+              showToast(`Ride details loaded, finding similar options...`)
+              setTimeout(() => setCurrentScreen('car-result'), 650)
+            }}
+          />
+        )
       
       default:
         return <SplashScreen variant="dark" {...commonToast} />
@@ -484,7 +494,7 @@ export default function App() {
           {isFullFlow && (
             <div className="text-center mt-2">
               <span className="text-[10px] px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Full App Mode — End-to-end booking flow with global state (work in progress)
+                Full App Mode — End-to-end booking flow with global state (rebook, gift, chat, interactive map)
               </span>
             </div>
           )}
