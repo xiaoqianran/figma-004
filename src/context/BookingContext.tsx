@@ -84,6 +84,9 @@ export interface BookingState {
     notificationsEnabled: boolean
     theme: 'light' | 'dark'
   }
+
+  // Demo gift / promo balance (updated via GiftCodePage redemption)
+  giftBalance: number
 }
 
 type BookingAction =
@@ -105,6 +108,8 @@ type BookingAction =
   | { type: 'RESET_BOOKING' }
   | { type: 'ADD_RECENT_DESTINATION'; payload: Location }
   | { type: 'ADD_COMPLETED_RIDE'; payload: { bookingId: string; rideName: string; price: number; destination: string; rating?: number; tip?: number } }
+  | { type: 'ADD_GIFT_BALANCE'; payload: number }
+  | { type: 'SET_GIFT_BALANCE'; payload: number }
 
 const initialState: BookingState = {
   isAuthenticated: false,
@@ -163,6 +168,7 @@ const initialState: BookingState = {
     notificationsEnabled: true,
     theme: 'light',
   },
+  giftBalance: 0,
 }
 
 function bookingReducer(state: BookingState, action: BookingAction): BookingState {
@@ -354,6 +360,18 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
       }
     }
 
+    case 'ADD_GIFT_BALANCE':
+      return {
+        ...state,
+        giftBalance: (state.giftBalance || 0) + (action.payload || 0),
+      }
+
+    case 'SET_GIFT_BALANCE':
+      return {
+        ...state,
+        giftBalance: Math.max(0, action.payload || 0),
+      }
+
     default:
       return state
   }
@@ -383,6 +401,11 @@ interface BookingContextValue {
   resetBooking: () => void
   addRecentDestination: (loc: Location) => void
   addCompletedRide: (ride: { bookingId: string; rideName: string; price: number; destination: string; rating?: number; tip?: number }) => void
+  rebookRide: (ride: { rideName?: string; destination: string; price?: number }) => void
+  // Gift / promo balance (demo - integrated with GiftCodePage)
+  giftBalance: number
+  addGiftBalance: (amount: number) => void
+  setGiftBalance: (amount: number) => void
   // Fake API helpers
   findRides: (destination: Location) => Promise<RideOption[]>
   processPayment: () => Promise<boolean>
@@ -417,6 +440,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         if (parsed.preferences) {
           dispatch({ type: 'SET_PREFERENCES', payload: parsed.preferences })
         }
+        if (typeof parsed.giftBalance === 'number') {
+          dispatch({ type: 'SET_GIFT_BALANCE', payload: parsed.giftBalance })
+        }
       } catch {
         // ignore corrupted storage
       }
@@ -431,9 +457,10 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       paymentMethod: state.paymentMethod,
       paymentMethods: state.paymentMethods,
       preferences: state.preferences,
+      giftBalance: state.giftBalance,
     }
     localStorage.setItem('rideshare_booking_state', JSON.stringify(toSave))
-  }, [state.isAuthenticated, state.user, state.paymentMethod, state.paymentMethods, state.preferences])
+  }, [state.isAuthenticated, state.user, state.paymentMethod, state.paymentMethods, state.preferences, state.giftBalance])
 
   const value: BookingContextValue = {
     state,
@@ -486,6 +513,33 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
     addCompletedRide: (ride) =>
       dispatch({ type: 'ADD_COMPLETED_RIDE', payload: ride }),
+
+    // Gift balance demo actions
+    giftBalance: state.giftBalance || 0,
+    addGiftBalance: (amount) => dispatch({ type: 'ADD_GIFT_BALANCE', payload: amount }),
+    setGiftBalance: (amount) => dispatch({ type: 'SET_GIFT_BALANCE', payload: amount }),
+
+    rebookRide: (ride) => {
+      if (!ride?.destination) return
+      const destLoc: Location = {
+        address: ride.destination,
+        subtitle: ride.rideName ? `Rebook • ${ride.rideName}` : 'From history',
+      }
+      dispatch({ type: 'SET_DESTINATION', payload: destLoc })
+      dispatch({ type: 'ADD_RECENT_DESTINATION', payload: destLoc })
+
+      // Infer preferredRideType from past rideName for natural prefill in flow
+      const name = (ride.rideName || '').toLowerCase()
+      let pType: 'economy' | 'comfort' | 'xl' = 'comfort'
+      if (name.includes('suv') || name.includes('cr-v') || name.includes('xl') || name.includes('honda')) {
+        pType = 'xl'
+      } else if (name.includes('tesla') || name.includes('bmw') || name.includes('premium') || name.includes('electric')) {
+        pType = 'comfort'
+      } else if (name.includes('camry') || name.includes('toyota')) {
+        pType = 'economy'
+      }
+      dispatch({ type: 'SET_PREFERRED_RIDE_TYPE', payload: pType })
+    },
 
     // Fake API calls with realistic delays
     findRides: async (destination: Location): Promise<RideOption[]> => {
@@ -588,6 +642,10 @@ export function useBooking() {
       resetBooking: () => {},
       addRecentDestination: () => {},
       addCompletedRide: () => {},
+      rebookRide: () => {},
+      giftBalance: 0,
+      addGiftBalance: () => {},
+      setGiftBalance: () => {},
       findRides: async () => [],
       processPayment: async () => true,
     } as BookingContextValue
