@@ -7,6 +7,13 @@ import { SignInScreen } from '../screens/SignInScreen'
 import { DestinationScreen } from '../screens/DestinationScreen'
 import { CarResultScreen } from '../screens/CarResultScreen'
 import { HomeScreen } from '../screens/HomeScreen'
+import { RideHistoryScreen } from '../screens/RideHistoryScreen'
+import { GiftCodePage } from '../screens/GiftCodePage'
+import { SettingsPage } from '../screens/SettingsPage'
+import { NotificationsScreen } from '../screens/NotificationsScreen'
+// BookingConfirmScreen available for future tests but not used in current smoke suite
+import { RideCard } from '../components/ui/RideCard'
+import { CreditCard } from '../components/ui/CreditCard'
 import { BookingProvider, useBooking, bookingReducer, initialState } from '../context/BookingContext'
 
 describe('Smoke Tests - Rideshare UI Kit Screens', () => {
@@ -215,6 +222,244 @@ describe('Overall app smoke (provider-wrapped critical paths)', () => {
       </BookingProvider>
     )
     expect(screen.getByText(/Where do you want to go/i)).toBeInTheDocument()
+  })
+})
+
+// ============================================================================
+// Expanded coverage wave: Rebooking, Gift, Filters, Payments, Notifications
+// ============================================================================
+describe('Ride History + Rebooking (mock context + user interactions)', () => {
+  it('renders RideHistoryScreen with completed rides from BookingProvider initial state', () => {
+    render(
+      <BookingProvider>
+        <RideHistoryScreen onBack={vi.fn()} onRebook={vi.fn()} />
+      </BookingProvider>
+    )
+
+    expect(screen.getByText(/Ride History/i)).toBeInTheDocument()
+    // From initialState: two completed rides
+    expect(screen.getByText('Tesla Model 3')).toBeInTheDocument()
+    expect(screen.getByText('Toyota Camry')).toBeInTheDocument()
+    expect(screen.getAllByText(/Book again/i).length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('calls onRebook handler when "Book again" button is clicked (mock prop + userEvent)', async () => {
+    const user = userEvent.setup()
+    const onRebook = vi.fn()
+    render(
+      <BookingProvider>
+        <RideHistoryScreen onBack={vi.fn()} onRebook={onRebook} />
+      </BookingProvider>
+    )
+
+    const rebookButtons = screen.getAllByRole('button', { name: /Book again/i })
+    await user.click(rebookButtons[0])
+
+    expect(onRebook).toHaveBeenCalledTimes(1)
+    expect(onRebook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bookingId: 'BK492183',
+        rideName: 'Tesla Model 3',
+      })
+    )
+  })
+})
+
+describe('Gift Code Redemption Flow (basic render + redeem button)', () => {
+  it('renders GiftCodePage input, redeem button, and demo code hints', () => {
+    const onRedeem = vi.fn()
+    render(<GiftCodePage onBack={vi.fn()} onRedeem={onRedeem} variant="light" />)
+
+    expect(screen.getByText(/Have a promo code\?/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/Enter code/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Redeem Code/i })).toBeInTheDocument()
+    expect(screen.getByText(/Try: WELCOME20/i)).toBeInTheDocument()
+  })
+
+  it('calls onRedeem with uppercased valid code when Redeem button clicked', async () => {
+    const user = userEvent.setup()
+    const onRedeem = vi.fn()
+    render(<GiftCodePage onBack={vi.fn()} onRedeem={onRedeem} variant="dark" />)
+
+    const input = screen.getByPlaceholderText(/Enter code/i)
+    const redeemBtn = screen.getByRole('button', { name: /Redeem Code/i })
+
+    await user.clear(input)
+    await user.type(input, 'welcome20')
+    await user.click(redeemBtn)
+
+    expect(onRedeem).toHaveBeenCalledWith('WELCOME20', 20)
+  })
+
+  it('shows success UI after redeeming a valid code (no crash, success message appears)', async () => {
+    const user = userEvent.setup()
+    render(<GiftCodePage onBack={vi.fn()} onRedeem={vi.fn()} />)
+
+    const input = screen.getByPlaceholderText(/Enter code/i)
+    await user.clear(input)
+    await user.type(input, 'RIDO20')
+    await user.click(screen.getByRole('button', { name: /Redeem Code/i }))
+
+    // After 650ms timeout inside component for state flip
+    await waitFor(() => {
+      expect(screen.getByText(/Code redeemed!/i)).toBeInTheDocument()
+      expect(screen.getByText(/\$20 added to your gift balance/i)).toBeInTheDocument()
+    })
+  })
+})
+
+describe('CarResultScreen rendering + filter/sort basics', () => {
+  it('renders CarResultScreen with multiple ride options and filter button', () => {
+    render(
+      <BookingProvider>
+        <CarResultScreen onConfirmRide={vi.fn()} onBack={vi.fn()} />
+      </BookingProvider>
+    )
+
+    // Header / results count (appears in TopBar title + bottom CTA button)
+    const chooseEls = screen.getAllByText(/Choose a ride/i)
+    expect(chooseEls.length).toBeGreaterThanOrEqual(1)
+    // Key rides from internal carOptions (order varies by default sort=price-low)
+    expect(screen.getByText(/Tesla Model 3/i)).toBeInTheDocument()
+    expect(screen.getByText(/Toyota Camry/i)).toBeInTheDocument()
+    expect(screen.getByText(/Honda CR-V/i)).toBeInTheDocument()
+    // Filter affordance
+    expect(screen.getByRole('button', { name: /Filter/i })).toBeInTheDocument()
+  })
+
+  it('RideCard component renders core ride details correctly (used by CarResult)', () => {
+    render(
+      <RideCard
+        name="Test EV"
+        type="Electric"
+        price="$9.99"
+        time="2 min"
+        rating="4.9"
+        seats={4}
+      />
+    )
+
+    expect(screen.getByText('Test EV')).toBeInTheDocument()
+    expect(screen.getByText(/Electric • 4 seats/i)).toBeInTheDocument()
+    expect(screen.getByText('$9.99')).toBeInTheDocument()
+    expect(screen.getByText(/4\.9 ★/i)).toBeInTheDocument()
+  })
+})
+
+describe('Payment Methods list and removal behavior (mock context)', () => {
+  it('SettingsPage renders payment methods list from context (multiple methods + default badges)', () => {
+    render(
+      <BookingProvider>
+        <SettingsPage onBack={vi.fn()} onAddPayment={vi.fn()} />
+      </BookingProvider>
+    )
+
+    expect(screen.getByText(/PAYMENT METHODS/i)).toBeInTheDocument()
+    // From initialState: Visa 4242, Mastercard 8888, Apple Pay, Cash
+    expect(screen.getByText(/Visa •••• 4242/i)).toBeInTheDocument()
+    expect(screen.getByText(/Mastercard •••• 8888/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Default/i).length).toBeGreaterThanOrEqual(1)
+    // Remove buttons only for removable (non-cash, >1 methods)
+    const removeButtons = screen.queryAllByRole('button', { name: /Remove/i })
+    expect(removeButtons.length).toBeGreaterThan(0)
+  })
+
+  it('clicking Remove on a payment triggers removePaymentMethod via confirm mock', async () => {
+    const user = userEvent.setup()
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    render(
+      <BookingProvider>
+        <SettingsPage onBack={vi.fn()} onAddPayment={vi.fn()} />
+      </BookingProvider>
+    )
+
+    const removeBtns = screen.getAllByRole('button', { name: /Remove/i })
+    await user.click(removeBtns[0])
+
+    expect(confirmSpy).toHaveBeenCalled()
+    confirmSpy.mockRestore()
+  })
+})
+
+describe('Activity / Notifications rendering (context-driven)', () => {
+  it('renders NotificationsScreen with activities from BookingProvider', () => {
+    render(
+      <BookingProvider>
+        <NotificationsScreen onBack={vi.fn()} />
+      </BookingProvider>
+    )
+
+    expect(screen.getByText(/Notifications/i)).toBeInTheDocument()
+    // Seed activities from initialState include these titles (some titles like "Ride completed" appear multiple times)
+    expect(screen.getByText(/Driver arrived/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Ride completed/i).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText(/Promo code applied/i)).toBeInTheDocument()
+  })
+
+  it('NotificationsScreen filter tabs exist and can switch (rides/offers)', async () => {
+    const user = userEvent.setup()
+    render(
+      <BookingProvider>
+        <NotificationsScreen onBack={vi.fn()} />
+      </BookingProvider>
+    )
+
+    // Filter buttons (from impl: All / Rides / Offers tabs). Use role+name regex to target tabs (All tab name="All 3", avoids "Mark all read" button)
+    expect(screen.getByRole('button', { name: /^All/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Rides/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Offers/ })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^Rides/ }))
+    // After filter, ride types should still be visible; promo may disappear
+    expect(screen.getByText(/Driver arrived/i)).toBeInTheDocument()
+  })
+
+  it('CreditCard component renders visual payment UI without crashing', () => {
+    render(
+      <CreditCard
+        variant="dark"
+        cardNumber="1234 •••• 5678"
+        balance="$42.00"
+        expiry="12/28"
+      />
+    )
+
+    expect(screen.getByText('1234 •••• 5678')).toBeInTheDocument()
+    expect(screen.getByText('$42.00')).toBeInTheDocument()
+  })
+})
+
+describe('BookingContext rebookRide + gift balance helpers (via hook + provider)', () => {
+  it('rebookRide action sets destination + preferredRideType from history payload', async () => {
+    const { result } = renderHook(() => useBooking(), {
+      wrapper: ({ children }) => <BookingProvider>{children}</BookingProvider>,
+    })
+
+    act(() => {
+      result.current.rebookRide({ rideName: 'Honda CR-V', destination: 'Gym', price: 14.2 })
+    })
+
+    await waitFor(() => {
+      expect(result.current.state.destination?.address).toBe('Gym')
+      expect(result.current.state.preferredRideType).toBe('xl') // inferred from CR-V / SUV
+    })
+  })
+
+  it('addGiftBalance and setGiftBalance mutate giftBalance correctly', async () => {
+    const { result } = renderHook(() => useBooking(), {
+      wrapper: ({ children }) => <BookingProvider>{children}</BookingProvider>,
+    })
+
+    act(() => {
+      result.current.addGiftBalance(25)
+    })
+    await waitFor(() => expect(result.current.giftBalance).toBe(25))
+
+    act(() => {
+      result.current.setGiftBalance(10)
+    })
+    await waitFor(() => expect(result.current.giftBalance).toBe(10))
   })
 })
 

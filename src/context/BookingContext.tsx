@@ -17,6 +17,21 @@ export interface RideOption {
   seats: number
 }
 
+export interface ActivityItem {
+  id: string
+  type: 'ride_completed' | 'driver_arrived' | 'promo' | 'payment_added' | 'payment_removed' | 'price_drop'
+  title: string
+  description: string
+  time: string
+  read: boolean
+  meta?: {
+    bookingId?: string
+    amount?: number
+    route?: string
+    [key: string]: string | number | boolean | undefined
+  }
+}
+
 export interface PaymentMethod {
   id: string
   type: 'visa' | 'mastercard' | 'applepay' | 'googlepay' | 'cash'
@@ -87,6 +102,9 @@ export interface BookingState {
 
   // Demo gift / promo balance (updated via GiftCodePage redemption)
   giftBalance: number
+
+  // Activity / Notifications center (lightweight history for demo)
+  activities: ActivityItem[]
 }
 
 type BookingAction =
@@ -98,6 +116,7 @@ type BookingAction =
   | { type: 'SET_PREFERRED_RIDE_TYPE'; payload: 'economy' | 'comfort' | 'xl' }
   | { type: 'SET_PAYMENT_METHOD'; payload: PaymentMethod }
   | { type: 'ADD_PAYMENT_METHOD'; payload: PaymentMethod }
+  | { type: 'REMOVE_PAYMENT_METHOD'; payload: string }
   | { type: 'UPDATE_USER'; payload: { name?: string; email?: string; phone?: string } }
   | { type: 'SET_PREFERENCES'; payload: Partial<{ notificationsEnabled: boolean; theme: 'light' | 'dark' }> }
   | { type: 'SET_LOADING'; payload: { isLoading: boolean; message?: string } }
@@ -110,6 +129,11 @@ type BookingAction =
   | { type: 'ADD_COMPLETED_RIDE'; payload: { bookingId: string; rideName: string; price: number; destination: string; rating?: number; tip?: number } }
   | { type: 'ADD_GIFT_BALANCE'; payload: number }
   | { type: 'SET_GIFT_BALANCE'; payload: number }
+  // Activity center actions
+  | { type: 'ADD_ACTIVITY'; payload: { type: ActivityItem['type']; title: string; description: string; meta?: ActivityItem['meta'] } }
+  | { type: 'MARK_ACTIVITY_READ'; payload: string } // id
+  | { type: 'MARK_ALL_ACTIVITIES_READ' }
+  | { type: 'SET_ACTIVITIES'; payload: ActivityItem[] }
 
 const initialState: BookingState = {
   isAuthenticated: false,
@@ -169,6 +193,15 @@ const initialState: BookingState = {
     theme: 'light',
   },
   giftBalance: 0,
+  activities: [
+    { id: 'act_001', type: 'driver_arrived', title: 'Driver arrived', description: 'Alex Rivera (Tesla Model 3 • 7ABC123) is at your pickup location.', time: '14m ago', read: false, meta: { bookingId: 'BK492183' } },
+    { id: 'act_002', type: 'ride_completed', title: 'Ride completed', description: 'Trip to Airport Terminal 2 • 12.4 mi • $18.75', time: '2h ago', read: false, meta: { bookingId: 'BK481902' } },
+    { id: 'act_003', type: 'promo', title: 'Promo code applied', description: 'RIDE20 redeemed — $8 added to your gift balance.', time: 'Yesterday', read: true, meta: { amount: 8 } },
+    { id: 'act_004', type: 'payment_added', title: 'Payment method added', description: 'Visa •••• 4242 set as default payment method.', time: '2d ago', read: true },
+    { id: 'act_005', type: 'price_drop', title: 'Price drop alert', description: 'Your frequent route to Work is now 14% cheaper. Typical savings: $2.10.', time: '3d ago', read: true, meta: { route: 'Work' } },
+    { id: 'act_006', type: 'ride_completed', title: 'Ride completed', description: 'Trip to Home • $8.90 • Rated 4★', time: 'Last week', read: true, meta: { bookingId: 'BK470112' } },
+    { id: 'act_007', type: 'promo', title: 'Gift redeemed', description: 'WELCOME20 — $20 credit added to wallet.', time: 'Last week', read: true, meta: { amount: 20 } },
+  ],
 }
 
 function bookingReducer(state: BookingState, action: BookingAction): BookingState {
@@ -225,6 +258,21 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
         ...state,
         paymentMethods: [...filtered, pm],
         paymentMethod: pm,
+      }
+    }
+
+    case 'REMOVE_PAYMENT_METHOD': {
+      const idToRemove = action.payload
+      const remaining = (state.paymentMethods || []).filter(p => p.id !== idToRemove)
+      // If we removed the current default, pick the first remaining as new default
+      let newDefault = state.paymentMethod
+      if (state.paymentMethod?.id === idToRemove) {
+        newDefault = remaining.length > 0 ? remaining[0] : null
+      }
+      return {
+        ...state,
+        paymentMethods: remaining,
+        paymentMethod: newDefault,
       }
     }
 
@@ -292,6 +340,7 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
     case 'COMPLETE_RIDE': {
       // Archive current active ride into history if present
       let newCompleted = state.completedRides
+      let newActivities = state.activities
       if (state.activeRide) {
         const ar = state.activeRide
         const already = state.completedRides.some(r => r.bookingId === ar.bookingId)
@@ -304,6 +353,20 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
             completedAt: 'Just now',
           }, ...state.completedRides].slice(0, 12)
         }
+        // Auto-log ride completion activity (makes Notifications feel alive)
+        const alreadyAct = state.activities.some(a => a.meta?.bookingId === ar.bookingId && a.type === 'ride_completed')
+        if (!alreadyAct) {
+          const rideCompleteAct: ActivityItem = {
+            id: 'act_auto_' + Date.now().toString(36),
+            type: 'ride_completed',
+            title: 'Ride completed',
+            description: `${ar.ride.name} to ${ar.destination.address} • $${ar.ride.price.toFixed(2)}`,
+            time: 'Just now',
+            read: false,
+            meta: { bookingId: ar.bookingId },
+          }
+          newActivities = [rideCompleteAct, ...state.activities].slice(0, 20)
+        }
       }
       return {
         ...state,
@@ -311,6 +374,7 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
         selectedRide: null,
         destination: null,
         completedRides: newCompleted,
+        activities: newActivities,
       }
     }
 
@@ -372,6 +436,46 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
         giftBalance: Math.max(0, action.payload || 0),
       }
 
+    case 'ADD_ACTIVITY': {
+      const timeStr = 'Just now'
+      const newAct: ActivityItem = {
+        id: 'act_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+        type: action.payload.type,
+        title: action.payload.title,
+        description: action.payload.description,
+        time: timeStr,
+        read: false,
+        meta: action.payload.meta,
+      }
+      return {
+        ...state,
+        activities: [newAct, ...state.activities].slice(0, 20),
+      }
+    }
+
+    case 'MARK_ACTIVITY_READ': {
+      return {
+        ...state,
+        activities: state.activities.map(a =>
+          a.id === action.payload ? { ...a, read: true } : a
+        ),
+      }
+    }
+
+    case 'MARK_ALL_ACTIVITIES_READ': {
+      return {
+        ...state,
+        activities: state.activities.map(a => ({ ...a, read: true })),
+      }
+    }
+
+    case 'SET_ACTIVITIES': {
+      return {
+        ...state,
+        activities: action.payload,
+      }
+    }
+
     default:
       return state
   }
@@ -389,6 +493,7 @@ interface BookingContextValue {
   setPreferredRideType: (type: 'economy' | 'comfort' | 'xl') => void
   setPaymentMethod: (pm: PaymentMethod) => void
   addPaymentMethod: (pm: PaymentMethod) => void
+  removePaymentMethod: (id: string) => void
   updateUser: (updates: { name?: string; email?: string; phone?: string }) => void
   setNotificationsEnabled: (enabled: boolean) => void
   setTheme: (theme: 'light' | 'dark') => void
@@ -406,6 +511,12 @@ interface BookingContextValue {
   giftBalance: number
   addGiftBalance: (amount: number) => void
   setGiftBalance: (amount: number) => void
+  // Activity / Notifications center (lightweight, tappable history)
+  activities: ActivityItem[]
+  unreadCount: number
+  addActivity: (activity: { type: ActivityItem['type']; title: string; description: string; meta?: ActivityItem['meta'] }) => void
+  markActivityAsRead: (id: string) => void
+  markAllActivitiesRead: () => void
   // Fake API helpers
   findRides: (destination: Location) => Promise<RideOption[]>
   processPayment: () => Promise<boolean>
@@ -443,6 +554,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         if (typeof parsed.giftBalance === 'number') {
           dispatch({ type: 'SET_GIFT_BALANCE', payload: parsed.giftBalance })
         }
+        if (Array.isArray(parsed.activities) && parsed.activities.length > 0) {
+          dispatch({ type: 'SET_ACTIVITIES', payload: parsed.activities })
+        }
       } catch {
         // ignore corrupted storage
       }
@@ -458,9 +572,10 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       paymentMethods: state.paymentMethods,
       preferences: state.preferences,
       giftBalance: state.giftBalance,
+      activities: (state.activities || []).slice(0, 12), // lightweight persist
     }
     localStorage.setItem('rideshare_booking_state', JSON.stringify(toSave))
-  }, [state.isAuthenticated, state.user, state.paymentMethod, state.paymentMethods, state.preferences, state.giftBalance])
+  }, [state.isAuthenticated, state.user, state.paymentMethod, state.paymentMethods, state.preferences, state.giftBalance, state.activities])
 
   const value: BookingContextValue = {
     state,
@@ -485,6 +600,15 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     setPaymentMethod: (pm) => dispatch({ type: 'SET_PAYMENT_METHOD', payload: pm }),
 
     addPaymentMethod: (pm) => dispatch({ type: 'ADD_PAYMENT_METHOD', payload: pm }),
+
+    removePaymentMethod: (id) => {
+      dispatch({ type: 'REMOVE_PAYMENT_METHOD', payload: id })
+      dispatch({ type: 'ADD_ACTIVITY', payload: {
+        type: 'payment_removed',
+        title: 'Payment method removed',
+        description: 'A payment method was removed from your account'
+      }})
+    },
 
     updateUser: (updates) => dispatch({ type: 'UPDATE_USER', payload: updates }),
 
@@ -518,6 +642,13 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     giftBalance: state.giftBalance || 0,
     addGiftBalance: (amount) => dispatch({ type: 'ADD_GIFT_BALANCE', payload: amount }),
     setGiftBalance: (amount) => dispatch({ type: 'SET_GIFT_BALANCE', payload: amount }),
+
+    // Activity center (lightweight)
+    activities: state.activities || [],
+    unreadCount: (state.activities || []).filter(a => !a.read).length,
+    addActivity: (act) => dispatch({ type: 'ADD_ACTIVITY', payload: act }),
+    markActivityAsRead: (id) => dispatch({ type: 'MARK_ACTIVITY_READ', payload: id }),
+    markAllActivitiesRead: () => dispatch({ type: 'MARK_ALL_ACTIVITIES_READ' }),
 
     rebookRide: (ride) => {
       if (!ride?.destination) return
@@ -630,6 +761,7 @@ export function useBooking() {
       setPreferredRideType: () => {},
       setPaymentMethod: () => {},
       addPaymentMethod: () => {},
+      removePaymentMethod: () => {},
       updateUser: () => {},
       setNotificationsEnabled: () => {},
       setTheme: () => {},
@@ -646,6 +778,11 @@ export function useBooking() {
       giftBalance: 0,
       addGiftBalance: () => {},
       setGiftBalance: () => {},
+      activities: [],
+      unreadCount: 0,
+      addActivity: () => {},
+      markActivityAsRead: () => {},
+      markAllActivitiesRead: () => {},
       findRides: async () => [],
       processPayment: async () => true,
     } as BookingContextValue

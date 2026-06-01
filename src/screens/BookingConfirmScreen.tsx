@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { ArrowLeft, Users, Star, CreditCard } from 'lucide-react'
 import { useBooking } from '../context/BookingContext'
 import { StatusBar } from '../components/ui/StatusBar'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
+import { FareBreakdown } from '../components/ui/FareBreakdown'
 
 interface BookingConfirmScreenProps {
   onBack?: () => void
@@ -11,8 +13,10 @@ interface BookingConfirmScreenProps {
 }
 
 export function BookingConfirmScreen({ onBack, onConfirm, onAddPayment }: BookingConfirmScreenProps) {
-  const { state, setPaymentMethod } = useBooking()
+  const { state, setPaymentMethod, giftBalance } = useBooking()
   const { destination, selectedRide, paymentMethod, pickup, paymentMethods } = state
+
+  const [isFareOpen, setIsFareOpen] = useState(false)
 
   if (!selectedRide || !destination) {
     return (
@@ -50,8 +54,17 @@ export function BookingConfirmScreen({ onBack, onConfirm, onAddPayment }: Bookin
                 <div className="text-gray-500 text-sm">{selectedRide.type} • {selectedRide.seats} seats</div>
               </div>
               <div className="text-right">
-                <div className="font-semibold text-2xl tabular-nums">{selectedRide.priceDisplay}</div>
-                <div className="text-emerald-600 text-xs font-medium">+{selectedRide.eta}</div>
+                <button
+                  onClick={() => setIsFareOpen(true)}
+                  className="text-right active:opacity-80 transition focus:outline-none"
+                  aria-label="View fare breakdown and price details"
+                >
+                  <div className="font-semibold text-2xl tabular-nums">{selectedRide.priceDisplay}</div>
+                  <div className="text-emerald-600 text-xs font-medium flex items-center justify-end gap-1">
+                    +{selectedRide.eta}
+                    <span className="ml-1 text-[#4c5df9] underline decoration-dotted decoration-1 underline-offset-2 text-[10px] font-semibold">Details</span>
+                  </div>
+                </button>
               </div>
             </div>
 
@@ -150,6 +163,14 @@ export function BookingConfirmScreen({ onBack, onConfirm, onAddPayment }: Bookin
         </Button>
         <div className="text-center mt-3 text-xs text-gray-400">You can cancel for free within 2 minutes</div>
       </div>
+
+      {/* Fare breakdown / price details modal - triggered from ride price or Details link */}
+      <FareBreakdown
+        isOpen={isFareOpen}
+        onClose={() => setIsFareOpen(false)}
+        ride={selectedRide}
+        giftBalance={giftBalance}
+      />
     </div>
   )
 }

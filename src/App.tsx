@@ -16,11 +16,13 @@ import { CarResultV2Screen } from './screens/CarResultV2Screen'
 import { RideshareApp } from './components/RideshareApp'
 import { BookingProvider } from './context/BookingContext'
 // Additional high-fidelity screens for complete Gallery coverage
-import { BookingConfirmScreen } from './screens/BookingConfirmScreen'
+import { BookingConfirmScreen } from './screens/BookingConfirmScreen' // available for gallery (currently not in active screen list)
 import { RideTrackingScreen } from './screens/RideTrackingScreen'
 import { ProfileScreen } from './screens/ProfileScreen'
 import { MessagesScreen } from './screens/MessagesScreen'
 import { RideHistoryScreen } from './screens/RideHistoryScreen'
+import { NotificationsScreen } from './screens/NotificationsScreen'
+import { WalletScreen } from './screens/WalletScreen'
 // Design System UI kit now powers most screens (Button, Input, Card, StatusBar, TopBar, RideCard, CreditCard...)
 import './theme' // side-effect import for any consumers if needed
 
@@ -95,6 +97,8 @@ type ScreenKey =
   | 'profile'
   | 'messages-screen'
   | 'ride-history'
+  | 'notifications'
+  | 'wallet'
 
 const screens: { key: ScreenKey; label: string; group: string }[] = [
   { key: 'splash-dark', label: 'Splash (Dark)', group: 'Onboarding' },
@@ -117,6 +121,8 @@ const screens: { key: ScreenKey; label: string; group: string }[] = [
   { key: 'messages-screen', label: 'Messages (Alt)', group: 'Core App' },
   { key: 'profile', label: 'Profile', group: 'Core App' },
   { key: 'ride-history', label: 'Ride History', group: 'Core App' },
+  { key: 'notifications', label: 'Notifications / Activity', group: 'Core App' },
+  { key: 'wallet', label: 'Wallet / Credits', group: 'Core App' },
   { key: 'gift-code', label: 'Gift Code', group: 'Core App' },
   { key: 'car-result-v2', label: 'Car Results V2', group: 'Booking' },
 ]
@@ -305,13 +311,14 @@ export default function App() {
             onBookRide={() => setCurrentScreen('destination')}
             onSearchDestination={() => setCurrentScreen('destination')}
             onQuickDestination={() => setCurrentScreen('destination')}
+            onOpenNotifications={() => setCurrentScreen('notifications')}
           />
         )
       
       case 'settings-dark':
-        return <SettingsPage variant="dark" onBack={() => setCurrentScreen('home')} onViewHistory={() => setCurrentScreen('ride-history')} onAddPayment={() => setCurrentScreen('add-card-dark')} onOpenGift={() => setCurrentScreen('gift-code')} onViewGift={() => setCurrentScreen('gift-code')} />
+        return <SettingsPage variant="dark" onBack={() => setCurrentScreen('home')} onViewHistory={() => setCurrentScreen('ride-history')} onAddPayment={() => setCurrentScreen('add-card-dark')} onOpenGift={() => setCurrentScreen('gift-code')} onViewGift={() => setCurrentScreen('gift-code')} onViewNotifications={() => setCurrentScreen('notifications')} onOpenWallet={() => setCurrentScreen('wallet')} />
       case 'settings-light':
-        return <SettingsPage variant="light" onBack={() => setCurrentScreen('home')} onViewHistory={() => setCurrentScreen('ride-history')} onAddPayment={() => setCurrentScreen('add-card-light')} onOpenGift={() => setCurrentScreen('gift-code')} onViewGift={() => setCurrentScreen('gift-code')} />
+        return <SettingsPage variant="light" onBack={() => setCurrentScreen('home')} onViewHistory={() => setCurrentScreen('ride-history')} onAddPayment={() => setCurrentScreen('add-card-light')} onOpenGift={() => setCurrentScreen('gift-code')} onViewGift={() => setCurrentScreen('gift-code')} onViewNotifications={() => setCurrentScreen('notifications')} onOpenWallet={() => setCurrentScreen('wallet')} />
       
       case 'rating-tips':
         return <RatingAndTipsPage variant="dark" onBack={() => setCurrentScreen('home')} />
@@ -320,7 +327,7 @@ export default function App() {
         return <MessagesPage variant="dark" onBack={() => setCurrentScreen('home')} />
       
       case 'gift-code':
-        return <GiftCodePage variant="dark" onBack={() => setCurrentScreen('home')} showToast={showToast} onRedeem={(_code, _amount) => { /* gallery isolated demo uses internal */ }} />
+        return <GiftCodePage variant="dark" onBack={() => setCurrentScreen('home')} showToast={showToast} onRedeem={(_code, _amount) => { /* gallery isolated demo uses internal */ }} onViewWallet={() => setCurrentScreen('wallet')} />
       
       case 'car-result-v2':
         return <CarResultV2Screen onBack={() => setCurrentScreen('home')} />
@@ -335,6 +342,7 @@ export default function App() {
           onComplete={() => { showToast('Ride completed'); setCurrentScreen('rating-tips') }}
           onCancel={() => setCurrentScreen('home')}
           onRideCompleted={() => setCurrentScreen('rating-tips')}
+          showToast={showToast}
         />
       
       case 'profile':
@@ -344,6 +352,8 @@ export default function App() {
           onOpenSettings={() => setCurrentScreen('settings-light')}
           onViewActiveRide={() => setCurrentScreen('ride-tracking')}
           onLogout={() => setCurrentScreen('splash-dark')}
+          onOpenNotifications={() => setCurrentScreen('notifications')}
+          onOpenWallet={() => setCurrentScreen('wallet')}
         />
       
       case 'messages-screen':
@@ -359,6 +369,29 @@ export default function App() {
               showToast(`Ride details loaded, finding similar options...`)
               setTimeout(() => setCurrentScreen('car-result'), 650)
             }}
+          />
+        )
+      
+      case 'notifications':
+        return (
+          <NotificationsScreen 
+            onBack={() => setCurrentScreen('home')} 
+            {...commonToast}
+            onViewHistory={() => setCurrentScreen('ride-history')}
+            onFindRides={() => {
+              showToast('Opening destination search (demo)', 'info')
+              setTimeout(() => setCurrentScreen('destination'), 420)
+            }}
+          />
+        )
+      
+      case 'wallet':
+        return (
+          <WalletScreen 
+            onBack={() => setCurrentScreen('home')} 
+            showToast={showToast}
+            onRedeemGift={() => setCurrentScreen('gift-code')}
+            onAddPromo={() => setCurrentScreen('gift-code')}
           />
         )
       

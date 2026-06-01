@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { ArrowLeft, Settings, CreditCard, Bell, Shield, LogOut, ChevronRight, Pencil, X, Check, Users, Lock, Download, Share2 } from 'lucide-react'
+import { ArrowLeft, Settings, CreditCard, Bell, Shield, LogOut, ChevronRight, Pencil, X, Check, Users, Lock, Download, Share2, Wallet } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useBooking } from '../context/BookingContext'
 import { StatusBar } from '../components/ui/StatusBar'
 import { Card } from '../components/ui/Card'
@@ -12,11 +13,13 @@ interface ProfileScreenProps {
   onOpenSettings?: () => void
   showToast?: (message: string, type?: 'success' | 'error' | 'info') => void
   onOpenMessages?: () => void
+  onOpenNotifications?: () => void
+  onOpenWallet?: () => void
 }
 
-export function ProfileScreen({ onBack, onManagePayments, onLogout, onViewActiveRide, onOpenSettings, showToast, onOpenMessages: _onOpenMessages }: ProfileScreenProps) {
-  const { state, logout, updateUser, setNotificationsEnabled } = useBooking()
-  const { user, paymentMethod, activeRide, preferences, giftBalance = 0 } = state
+export function ProfileScreen({ onBack, onManagePayments, onLogout, onViewActiveRide, onOpenSettings, showToast, onOpenMessages: _onOpenMessages, onOpenNotifications, onOpenWallet }: ProfileScreenProps) {
+  const { state, logout, updateUser, unreadCount } = useBooking()
+  const { user, paymentMethod, activeRide, giftBalance = 0 } = state
 
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(user?.name || '')
@@ -25,6 +28,18 @@ export function ProfileScreen({ onBack, onManagePayments, onLogout, onViewActive
   // Local demo state for privacy panel + toggles (isolated, no reducer needed)
   const [showPrivacy, setShowPrivacy] = useState(false)
   const [shareTripStatus, setShareTripStatus] = useState(true)
+
+  // Share Trip modal (available when active ride present)
+  const [showShareModal, setShowShareModal] = useState(false)
+
+  // Interactive emergency contacts (was pure toast; now fully functional demo)
+  const [emergencyContacts, setEmergencyContacts] = useState([
+    { id: 1, name: 'Jamie P. (sister)', phone: '+1 (415) 555-0192' },
+    { id: 2, name: 'Sam K. (roommate)', phone: '+1 (650) 555-4411' },
+  ])
+  const [showAddContact, setShowAddContact] = useState(false)
+  const [newContactName, setNewContactName] = useState('')
+  const [newContactPhone, setNewContactPhone] = useState('')
 
   const handleLogout = () => {
     logout()
@@ -50,15 +65,62 @@ export function ProfileScreen({ onBack, onManagePayments, onLogout, onViewActive
     setIsEditing(false)
   }
 
-  const notifValue = preferences?.notificationsEnabled ? 'On' : 'Off'
+  // Share trip helpers (only meaningful with activeRide)
+  const shareLink = activeRide 
+    ? `https://meteor.app/trip/${activeRide.bookingId || 'demo-trip-42'}` 
+    : 'https://meteor.app/trip/demo-trip-42'
+
+  const handleCopyLinkProfile = async () => {
+    try {
+      await navigator.clipboard.writeText(shareLink)
+      showToast?.('Trip link copied to clipboard!', 'success')
+    } catch {
+      showToast?.(`Link: ${shareLink}`, 'info')
+    }
+  }
+
+  const handleSendViaMessagesProfile = () => {
+    showToast?.('Opening Messages composer (demo) — link sent!', 'success')
+    setShowShareModal(false)
+  }
+
+  const handleShareToWhatsAppProfile = () => {
+    showToast?.('Shared via WhatsApp (demo)', 'success')
+    setShowShareModal(false)
+  }
+
+  const openShareModalProfile = () => {
+    if (!activeRide) {
+      showToast?.('Start a ride to share live trip status', 'info')
+      return
+    }
+    setShowShareModal(true)
+  }
+
+  // Emergency contacts actions (now interactive, no longer dead toast-only)
+  const addEmergencyContact = () => {
+    if (!newContactName.trim() || !newContactPhone.trim()) return
+    const newC = {
+      id: Date.now(),
+      name: newContactName.trim(),
+      phone: newContactPhone.trim(),
+    }
+    setEmergencyContacts(prev => [...prev, newC])
+    showToast?.(`Added ${newC.name}`, 'success')
+    setNewContactName('')
+    setNewContactPhone('')
+    setShowAddContact(false)
+  }
+
+  const removeEmergencyContact = (id: number, name: string) => {
+    setEmergencyContacts(prev => prev.filter(c => c.id !== id))
+    showToast?.(`Removed ${name}`, 'info')
+  }
+
   const menuItems = [
     { icon: CreditCard, label: 'Payment methods', action: onManagePayments, value: paymentMethod ? `${paymentMethod.brand} •••• ${paymentMethod.last4}` : 'Add card' },
-    { icon: Bell, label: 'Notifications', action: () => {
-        const curr = preferences?.notificationsEnabled ?? true
-        const next = !curr
-        setNotificationsEnabled(next)
-        showToast?.(`Notifications ${next ? 'enabled' : 'muted'}`, 'success')
-      }, value: notifValue },
+    { icon: Wallet, label: 'Wallet & Credits', action: onOpenWallet, value: giftBalance > 0 ? `$${giftBalance}` : 'View' },
+    { icon: Bell, label: 'Activity Center', action: onOpenNotifications || (() => showToast?.('Opening notifications & activity...', 'info')), value: unreadCount > 0 ? `${unreadCount} new` : 'View' },
     { icon: Shield, label: 'Privacy & Safety', action: () => setShowPrivacy(true) },
     { icon: Settings, label: 'App settings', action: onOpenSettings },
   ]
@@ -173,12 +235,20 @@ export function ProfileScreen({ onBack, onManagePayments, onLogout, onViewActive
                 <div className="font-semibold text-sm text-[#1c1f2a]">Ride in progress</div>
                 <div className="text-xs text-gray-500 truncate">{activeRide.pickup.address} → {activeRide.destination.address}</div>
               </div>
-              <button 
-                onClick={() => onViewActiveRide?.()}
-                className="text-xs px-3 py-1 bg-emerald-500 text-white rounded-xl font-medium active:bg-emerald-600"
-              >
-                View
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => onViewActiveRide?.()}
+                  className="text-xs px-3 py-1 bg-emerald-500 text-white rounded-xl font-medium active:bg-emerald-600"
+                >
+                  View
+                </button>
+                <button 
+                  onClick={openShareModalProfile}
+                  className="text-xs px-2.5 py-1 bg-white border border-emerald-200 text-emerald-700 rounded-xl font-medium flex items-center gap-1 active:bg-emerald-50"
+                >
+                  <Share2 size={12} /> Share
+                </button>
+              </div>
             </div>
           </Card>
         </div>
@@ -194,7 +264,12 @@ export function ProfileScreen({ onBack, onManagePayments, onLogout, onViewActive
           >
             <div className="flex items-center gap-3">
               <item.icon size={20} className="text-[#4c5df9]" />
-              <span className="font-medium text-[15px] text-[#1c1f2a]">{item.label}</span>
+              <span className="font-medium text-[15px] text-[#1c1f2a] flex items-center gap-1.5">
+                {item.label}
+                {item.label === 'Activity Center' && unreadCount > 0 && (
+                  <span className="inline-block w-2 h-2 rounded-full bg-red-500" title={`${unreadCount} unread`} />
+                )}
+              </span>
             </div>
             <div className="flex items-center gap-1 text-sm text-gray-400">
               {item.value && <span className="mr-1 text-right max-w-[120px] truncate">{item.value}</span>}
@@ -278,18 +353,61 @@ export function ProfileScreen({ onBack, onManagePayments, onLogout, onViewActive
               <div className="pt-1 border-t border-gray-100">
                 <div className="text-[11px] uppercase tracking-widest text-gray-500 px-1 mb-1.5">EMERGENCY CONTACTS</div>
                 <div className="space-y-1 text-xs">
-                  <div className="flex justify-between items-center bg-[#f8fafc] px-3 py-2 rounded-xl">
-                    <span>Jamie P. (sister) • +1 (415) 555-0192</span>
-                  </div>
-                  <div className="flex justify-between items-center bg-[#f8fafc] px-3 py-2 rounded-xl">
-                    <span>Sam K. (roommate) • +1 (650) 555-4411</span>
-                  </div>
+                  {emergencyContacts.length === 0 && (
+                    <div className="text-gray-400 px-1 py-1">No contacts yet.</div>
+                  )}
+                  {emergencyContacts.map((c) => (
+                    <div key={c.id} className="flex justify-between items-center bg-[#f8fafc] px-3 py-2 rounded-xl">
+                      <span>{c.name} • {c.phone}</span>
+                      <button 
+                        onClick={() => removeEmergencyContact(c.id, c.name)}
+                        className="text-red-400 active:text-red-600 p-1 -mr-1"
+                        aria-label={`Remove ${c.name}`}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
+
+                {/* Add contact form (toggled) */}
+                {showAddContact && (
+                  <div className="mt-2 space-y-2 bg-white border border-gray-100 p-3 rounded-2xl">
+                    <input
+                      value={newContactName}
+                      onChange={(e) => setNewContactName(e.target.value)}
+                      placeholder="Name (e.g. Mom)"
+                      className="w-full text-sm bg-[#f8fafc] border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#4c5df9]"
+                    />
+                    <input
+                      value={newContactPhone}
+                      onChange={(e) => setNewContactPhone(e.target.value)}
+                      placeholder="Phone (e.g. +1 555-1234)"
+                      className="w-full text-sm bg-[#f8fafc] border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#4c5df9]"
+                    />
+                    <div className="flex gap-2 pt-1">
+                      <button 
+                        onClick={() => { setShowAddContact(false); setNewContactName(''); setNewContactPhone('') }}
+                        className="flex-1 py-1.5 text-xs rounded-xl border active:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        onClick={addEmergencyContact}
+                        disabled={!newContactName.trim() || !newContactPhone.trim()}
+                        className="flex-1 py-1.5 text-xs rounded-xl bg-[#4c5df9] text-white disabled:opacity-50 active:bg-[#3a4bd1]"
+                      >
+                        Add contact
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <button 
-                  onClick={() => showToast?.('Emergency contacts manager opened (demo)', 'info')}
-                  className="mt-2 text-xs w-full py-2 text-[#4c5df9] font-medium active:bg-[#f0f4ff] rounded-xl"
+                  onClick={() => setShowAddContact(!showAddContact)}
+                  className="mt-2 text-xs w-full py-2 text-[#4c5df9] font-medium active:bg-[#f0f4ff] rounded-xl flex items-center justify-center gap-1"
                 >
-                  + Manage contacts or add new
+                  {showAddContact ? 'Hide add form' : '+ Add emergency contact'}
                 </button>
               </div>
 
@@ -315,6 +433,66 @@ export function ProfileScreen({ onBack, onManagePayments, onLogout, onViewActive
       )}
 
       <div className="text-center text-[10px] text-gray-400 pb-6">Meteor v4.2.1 • San Francisco</div>
+
+      {/* Share Trip modal / sheet for Profile (nice centered modal for variety + polish) */}
+      <AnimatePresence>
+        {showShareModal && (
+          <div className="absolute inset-0 z-[80] flex items-center justify-center bg-black/50 p-4" onClick={() => setShowShareModal(false)}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+              className="bg-white w-full max-w-[320px] rounded-3xl shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal header */}
+              <div className="px-5 pt-5 pb-3 flex items-center justify-between border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <Share2 size={20} className="text-[#4c5df9]" />
+                  <span className="font-semibold text-lg tracking-tight">Share your trip</span>
+                </div>
+                <button onClick={() => setShowShareModal(false)} className="p-2 text-gray-400 active:text-gray-600"><X size={20} /></button>
+              </div>
+
+              <div className="p-5">
+                <div className="text-sm text-gray-500 mb-4">Send this link so friends &amp; family can follow your ride live.</div>
+
+                {/* Link box */}
+                <div className="bg-[#f8fafc] rounded-2xl border border-gray-200 p-3 mb-4">
+                  <div className="text-[10px] text-gray-500 mb-1 px-1">SECURE LINK</div>
+                  <div className="font-mono text-xs text-[#1c1f2a] break-all leading-snug">{shareLink}</div>
+                </div>
+
+                {/* Actions */}
+                <div className="space-y-2">
+                  <button onClick={handleCopyLinkProfile} className="w-full py-3 rounded-2xl bg-[#4c5df9] active:bg-[#3a4bd1] text-white font-semibold flex items-center justify-center gap-2">
+                    Copy link
+                  </button>
+                  <button onClick={handleSendViaMessagesProfile} className="w-full py-3 rounded-2xl border border-gray-200 active:bg-gray-50 font-medium flex items-center justify-center gap-2">
+                    Send via Messages
+                  </button>
+                  <button onClick={handleShareToWhatsAppProfile} className="w-full py-3 rounded-2xl border border-gray-200 active:bg-gray-50 font-medium flex items-center justify-center gap-2">
+                    Share to WhatsApp (demo)
+                  </button>
+                </div>
+
+                {/* QR placeholder */}
+                <div className="mt-5 flex items-center justify-center gap-3 text-center">
+                  <div className="w-16 h-16 rounded-2xl border border-gray-200 bg-white p-1.5">
+                    <div className="w-full h-full bg-[repeating-linear-gradient(0deg,#1c1f2a_0,#1c1f2a_2px,transparent_2px,transparent_6px),repeating-linear-gradient(90deg,#1c1f2a_0,#1c1f2a_2px,transparent_2px,transparent_6px)] rounded-lg" />
+                  </div>
+                  <div className="text-left text-[10px] text-gray-400 leading-tight">
+                    QR code<br />for quick<br />mobile share
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-[#f8fafc] px-5 py-3 text-center text-[10px] text-gray-400 border-t">Link valid for this ride only • Tap outside to close</div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

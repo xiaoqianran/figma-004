@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MapPin, Clock, Navigation } from 'lucide-react'
+import { MapPin, Clock, Navigation, Bell } from 'lucide-react'
 import { StatusBar } from '../components/ui/StatusBar'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -12,10 +12,11 @@ interface HomeScreenProps {
   onQuickDestination?: (dest: { label?: string; sub?: string; address?: string } | string) => void
   onViewActiveRide?: () => void
   showToast?: (message: string, type?: 'success' | 'error' | 'info') => void
+  onOpenNotifications?: () => void
 }
 
-export function HomeScreen({ onBack: _onBack, onBookRide, onSearchDestination, onQuickDestination, onViewActiveRide }: HomeScreenProps) {
-  const { state, setPreferredRideType } = useBooking()
+export function HomeScreen({ onBack: _onBack, onBookRide, onSearchDestination, onQuickDestination, onViewActiveRide, onOpenNotifications }: HomeScreenProps) {
+  const { state, setPreferredRideType, unreadCount } = useBooking()
   const { user, activeRide, preferredRideType: selectedRideType = 'comfort', recentDestinations = [] } = state
 
   const [pickup, setPickup] = useState('Current Location')
@@ -47,14 +48,34 @@ export function HomeScreen({ onBack: _onBack, onBookRide, onSearchDestination, o
       {/* StatusBar (design system) */}
       <StatusBar variant="light" />
 
-      {/* Top greeting + avatar */}
+      {/* Top greeting + avatar + notifications bell (wired to Activity Center).
+          Bell + optional unread badge (from BookingContext unreadCount) is the primary entrypoint to NotificationsScreen.
+          Taps open as overlay (full-flow) or direct nav (gallery) via the onOpenNotifications prop. */}
       <div className="px-5 pt-3 pb-2 flex items-center justify-between">
         <div>
           <div className="text-xs text-gray-500">Good morning</div>
           <div className="font-semibold text-xl -mt-0.5" style={{ fontFamily: 'Sen, system-ui, sans-serif' }}>{user?.name || 'Porsing Wilson'}</div>
         </div>
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#4c5df9] to-violet-500 flex items-center justify-center text-white font-bold shadow text-sm tracking-tight">
-          {(user?.name || 'PW').split(/\s+/).map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+
+        <div className="flex items-center gap-2.5">
+          {/* Bell icon with live unread badge from context (first-class notifications integration) */}
+          <button
+            onClick={() => onOpenNotifications?.()}
+            className="relative w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 active:bg-gray-100 text-gray-600 active:text-[#4c5df9] transition"
+            aria-label="Open notifications and activity center"
+            title={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
+          >
+            <Bell size={19} />
+            {unreadCount > 0 && (
+              <div className="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-[5px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white tabular-nums">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </div>
+            )}
+          </button>
+
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#4c5df9] to-violet-500 flex items-center justify-center text-white font-bold shadow text-sm tracking-tight">
+            {(user?.name || 'PW').split(/\s+/).map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+          </div>
         </div>
       </div>
 
@@ -158,7 +179,13 @@ export function HomeScreen({ onBack: _onBack, onBookRide, onSearchDestination, o
       <div className="px-5 pt-5">
         <div className="flex items-center justify-between mb-2 px-0.5">
           <div className="uppercase tracking-[1px] text-[10px] font-semibold text-gray-400">SAVED PLACES</div>
-          <button className="text-[#4c5df9] text-sm font-medium">See all</button>
+          <button 
+            onClick={() => onSearchDestination?.()}
+            className="text-[#4c5df9] text-sm font-medium active:text-[#3a4bd1] active:scale-[0.985] transition-all"
+            aria-label="See all saved places"
+          >
+            See all
+          </button>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
           {quickPlaces.map((p, i) => (

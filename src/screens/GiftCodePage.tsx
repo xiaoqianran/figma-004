@@ -6,9 +6,10 @@ interface GiftCodePageProps {
   variant?: 'light' | 'dark'
   showToast?: (message: string, type?: 'success' | 'error' | 'info') => void
   onRedeem?: (code: string, amount: number) => void
+  onViewWallet?: () => void
 }
 
-export function GiftCodePage({ onBack, variant = 'dark', showToast, onRedeem }: GiftCodePageProps) {
+export function GiftCodePage({ onBack, variant = 'dark', showToast, onRedeem, onViewWallet }: GiftCodePageProps) {
   const isDark = variant === 'dark'
   const [code, setCode] = useState('RIDO20')
   const [redeemed, setRedeemed] = useState(false)
@@ -162,12 +163,25 @@ export function GiftCodePage({ onBack, variant = 'dark', showToast, onRedeem }: 
       {/* Bottom actions */}
       <div className="px-6 pb-8 pt-2">
         {success ? (
-          <button 
-            onClick={handleBackFromSuccess}
-            className="btn-primary w-full h-[54px] text-[17px] font-semibold"
-          >
-            Return to Settings
-          </button>
+          <div className="space-y-2.5">
+            {onViewWallet && (
+              <button 
+                onClick={() => {
+                  // Optional: parent can choose to keep or navigate away
+                  onViewWallet()
+                }}
+                className="w-full h-[54px] rounded-2xl border border-[#4c5df9] text-[#4c5df9] text-[17px] font-semibold active:bg-[#f0f4ff] transition"
+              >
+                View in Wallet
+              </button>
+            )}
+            <button 
+              onClick={handleBackFromSuccess}
+              className="btn-primary w-full h-[54px] text-[17px] font-semibold"
+            >
+              {onViewWallet ? 'Done' : 'Return to Settings'}
+            </button>
+          </div>
         ) : (
           <>
             <button 

@@ -19,6 +19,8 @@ import { SettingsPage } from '../screens/SettingsPage'
 import { RatingAndTipsPage } from '../screens/RatingAndTipsPage'
 import { RideHistoryScreen } from '../screens/RideHistoryScreen'
 import { GiftCodePage } from '../screens/GiftCodePage'
+import { NotificationsScreen } from '../screens/NotificationsScreen'
+import { WalletScreen } from '../screens/WalletScreen'
 import { BottomNavBar, NavTab } from './BottomNavBar'
 
 // Main views for the integrated experience
@@ -35,6 +37,8 @@ type AppView =
   | 'rating'
   | 'history'
   | 'gift'
+  | 'notifications'
+  | 'wallet'
 
 interface RideshareAppProps {
   initialView?: AppView
@@ -46,6 +50,7 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
   const [, setPendingDestination] = useState<Location | null>(null)
   const [profileView, setProfileView] = useState<'main' | 'settings'>('main')
   const [appToast, setAppToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+  const [showNotifications, setShowNotifications] = useState(false)
 
   // Local toast fn defined early so all later handlers can reference safely
   const showToastInApp = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -68,6 +73,7 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
     submitRating,
     rebookRide,
     addGiftBalance,
+    addActivity,
   } = useBooking()
 
   const isAuthenticated = state.isAuthenticated
@@ -82,13 +88,14 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
   }
 
   const goBack = () => {
+    setShowNotifications(false)
     if (viewHistory.length > 0) {
       const prev = viewHistory[viewHistory.length - 1]
       setViewHistory(prev => prev.slice(0, -1))
       setCurrentView(prev)
     } else {
       // Sensible fallbacks
-      if (['destination', 'car-results', 'booking-confirm', 'add-payment', 'rating', 'history', 'gift'].includes(currentView)) {
+      if (['destination', 'car-results', 'booking-confirm', 'add-payment', 'rating', 'history', 'gift', 'notifications', 'wallet'].includes(currentView)) {
         setCurrentView('home')
         setNavTab('home')
       } else if (['signin-welcome', 'signin-create'].includes(currentView)) {
@@ -110,6 +117,8 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
       setViewHistory([])
       setCurrentView('home')
       setNavTab('home')
+      setShowNotifications(false)
+      setProfileView('main')
     }, 520)
   }
 
@@ -165,6 +174,13 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
   // After adding payment in flow (AddCardScreen now sets the method via context)
   const handlePaymentAdded = () => {
     stopLoading()
+    // Log to Activity feed (makes the new Notifications screen feel connected and real)
+    addActivity?.({ 
+      type: 'payment_added', 
+      title: 'Payment method added', 
+      description: 'New card saved and set as default. Ready for instant bookings.' 
+    })
+
     if (currentView === 'add-payment') {
       // If user came from Profile > Payments, return to profile overlay (keep navTab)
       if (navTab === 'profile') {
@@ -193,6 +209,8 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
     setCurrentView('home')
     setNavTab('home')
     setViewHistory([])
+    setShowNotifications(false)
+    setProfileView('main')
   }
 
   // Gift code flow (integrates GiftCodePage)
@@ -200,8 +218,31 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
     navigateTo('gift')
   }
 
+  // Wallet / Credits (monetization demo screen)
+  const handleOpenWallet = () => {
+    navigateTo('wallet')
+  }
+
+  // Notifications / Activity Center
+  // Opens as rich overlay when on main home (preserves BottomNav + context of app), full navigation fallback elsewhere.
+  // This makes the bell + Activity Center feel like first-class integrated part of the demo in Full App Flow.
+  const handleOpenNotifications = () => {
+    if (currentView === 'home') {
+      setShowNotifications(true)
+    } else {
+      navigateTo('notifications')
+    }
+  }
+
   const handleGiftRedeem = (code: string, amount: number) => {
     addGiftBalance(amount)
+    // Log to Activity Center so Notifications feels alive + connected to real actions
+    addActivity?.({ 
+      type: 'promo', 
+      title: 'Promo code applied', 
+      description: `${code} redeemed — $${amount} added to your gift balance.`, 
+      meta: { amount } 
+    })
     // Local toast for full-flow feedback (GiftCodePage also shows its own success panel)
     showToastInApp(`Code ${code} redeemed! $${amount} added to wallet`, 'success')
   }
@@ -254,6 +295,7 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
   // Bottom nav handler (only meaningful on main screens)
   const handleTabChange = (tab: NavTab) => {
     setNavTab(tab)
+    setShowNotifications(false) // close notifications overlay when switching main tabs
 
     if (tab === 'home') {
       setCurrentView('home')
@@ -282,6 +324,16 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
   const handleShowHelpFromSettings = () => {
     // Help panel is self-contained inside SettingsPage; just a hint toast
     showToastInApp('Help center: see FAQ + support actions inside the Help panel')
+  }
+
+  const handleOpenNotificationsFromProfileOrSettings = () => {
+    // Close profile/settings overlays first (they cover the home header bell), then open notifications as overlay
+    setNavTab('home')
+    setProfileView('main')
+    setShowNotifications(false) // ensure clean
+    setTimeout(() => {
+      handleOpenNotifications()
+    }, 60)
   }
 
   // showToast adapter for components that expect the typed signature (uses existing app toast layer)
@@ -339,6 +391,7 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
             onSearchDestination={handleOpenDestination}
             onQuickDestination={(loc: { label?: string; sub?: string; subtitle?: string; address?: string } | string) => handleDestinationConfirmed({ address: (typeof loc === 'string' ? loc : (loc?.label || loc?.address || 'Selected Place')), subtitle: (typeof loc === 'object' && loc ? (loc.sub || loc.subtitle) : undefined) })}
             onViewActiveRide={() => setCurrentView('ride-tracking')}
+            onOpenNotifications={handleOpenNotifications}
           />
 
           {/* Overlay tabs content */}
@@ -377,9 +430,12 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
                       setNavTab('home')
                       setViewHistory([])
                       setProfileView('main')
+                      setShowNotifications(false)
                     }}
                     showToast={showToast}
                     onOpenMessages={handleOpenMessagesFromSettings}
+                    onOpenNotifications={handleOpenNotificationsFromProfileOrSettings}
+                    onOpenWallet={handleOpenWallet}
                   />
                 ) : (
                   <SettingsPage 
@@ -394,8 +450,41 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
                     onOpenMessages={handleOpenMessagesFromSettings}
                     onOpenGift={handleOpenGiftFromSettings}
                     onShowHelp={handleShowHelpFromSettings}
+                    onViewNotifications={handleOpenNotificationsFromProfileOrSettings}
+                    onOpenWallet={handleOpenWallet}
                   />
                 )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Notifications overlay (full-flow): opened from HomeScreen bell (next to greeting/avatar) or Profile/Settings menu items.
+              Uses overlay (not full view replace) so BottomNav stays visible — makes Notifications first-class & alive in the demo.
+              Gallery mode uses direct screen navigation instead (see App.tsx). */}
+          <AnimatePresence>
+            {showNotifications && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                exit={{ opacity: 0, y: 10 }}
+                className="absolute inset-0 bg-[#f8fafc] z-[45]"
+              >
+                <NotificationsScreen 
+                  onBack={() => setShowNotifications(false)} 
+                  showToast={showToast} 
+                  onViewHistory={() => {
+                    setShowNotifications(false)
+                    navigateTo('history')
+                  }}
+                  onFindRides={() => {
+                    setShowNotifications(false)
+                    setCurrentView('home')
+                    setNavTab('home')
+                    setTimeout(() => {
+                      handleOpenDestination()
+                    }, 180)
+                  }}
+                />
               </motion.div>
             )}
           </AnimatePresence>
@@ -456,11 +545,17 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
             setCurrentView('home') 
             setNavTab('home')
           }} 
-          onCancel={() => {
-            handleRideComplete() // cancel clears ride and returns home
+          onCancel={(reason) => {
+            // Rich feedback for the new Cancel Ride flow (reason collected safely in RideTrackingScreen sheet)
+            const toastMsg = reason
+              ? `Ride cancelled: ${reason}. No charge applied.`
+              : 'Ride cancelled. No charge applied.'
+            showToastInApp(toastMsg, 'success')
+            handleRideComplete() // existing cancel logic: clears active ride + resets + returns home
           }}
           onRideCompleted={handleShowRating}
           onComplete={handleRideComplete} // fallback / cancel path
+          showToast={showToast}
         />
       )
     }
@@ -498,6 +593,26 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
       )
     }
 
+    if (currentView === 'notifications') {
+      // Fallback full-view render (used if deep-navigated outside home; primary path in full-flow is the home overlay for bell/menu)
+      return (
+        <NotificationsScreen 
+          onBack={goBack}
+          showToast={showToast}
+          onViewHistory={() => navigateTo('history')}
+          onFindRides={() => {
+            // Close notifications and kick off destination search flow
+            setCurrentView('home')
+            setNavTab('home')
+            setShowNotifications(false)
+            setTimeout(() => {
+              handleOpenDestination()
+            }, 180)
+          }}
+        />
+      )
+    }
+
     if (currentView === 'gift') {
       return (
         <GiftCodePage 
@@ -505,12 +620,24 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
           onBack={goBack} 
           showToast={showToast}
           onRedeem={handleGiftRedeem}
+          onViewWallet={handleOpenWallet}
+        />
+      )
+    }
+
+    if (currentView === 'wallet') {
+      return (
+        <WalletScreen 
+          onBack={goBack}
+          showToast={showToast}
+          onRedeemGift={() => navigateTo('gift')}
+          onAddPromo={() => navigateTo('gift')}
         />
       )
     }
 
     // Fallback
-    return <HomeScreen onSearchDestination={handleOpenDestination} />
+    return <HomeScreen onSearchDestination={handleOpenDestination} onOpenNotifications={handleOpenNotifications} />
   }
 
   return (

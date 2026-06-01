@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react'
-import { ArrowLeft, ChevronRight, CreditCard as CreditCardIcon, Plus, Gift, X } from 'lucide-react'
+import { ArrowLeft, ChevronRight, CreditCard as CreditCardIcon, Plus, Gift, X, Wallet } from 'lucide-react'
 import { useBooking, PaymentMethod } from '../context/BookingContext'
 
 interface SettingsPageProps {
@@ -13,6 +13,8 @@ interface SettingsPageProps {
   onOpenGift?: () => void
   onViewGift?: () => void
   onShowHelp?: () => void
+  onViewNotifications?: () => void
+  onOpenWallet?: () => void
 }
 
 interface MenuItem {
@@ -23,8 +25,8 @@ interface MenuItem {
   action?: 'payment' | 'history' | 'gift'
 }
 
-export function SettingsPage({ onBack, variant = 'dark', onAddPayment, onViewHistory, showToast, onOpenMessages, onOpenGift, onViewGift, onShowHelp }: SettingsPageProps) {
-  const { state, setPaymentMethod, setNotificationsEnabled, setTheme, updateUser, addGiftBalance } = useBooking()
+export function SettingsPage({ onBack, variant = 'dark', onAddPayment, onViewHistory, showToast, onOpenMessages, onOpenGift, onViewGift, onShowHelp, onViewNotifications, onOpenWallet }: SettingsPageProps) {
+  const { state, setPaymentMethod, removePaymentMethod, setNotificationsEnabled, setTheme, updateUser, addGiftBalance, unreadCount } = useBooking()
   const { user, paymentMethods, paymentMethod, preferences, giftBalance = 0 } = state
 
   // Theme from context pref takes precedence so changing it affects this screen live
@@ -64,6 +66,8 @@ export function SettingsPage({ onBack, variant = 'dark', onAddPayment, onViewHis
     { icon: <div className="w-6 h-6 text-white">💳</div>, label: 'Payment Card', color: isDark ? '#f8fafc' : '#161a21', bg: isDark ? '#d78d5666' : '#d78d56' },
     { icon: <div className="w-6 h-6 text-white">📍</div>, label: 'Trip History', color: isDark ? '#f8fafc' : '#161a21', bg: isDark ? '#56b7df66' : '#56b7df', action: 'history' },
     { icon: <div className="w-6 h-6 text-white">🎁</div>, label: 'Gift Cards', color: isDark ? '#f8fafc' : '#161a21', bg: isDark ? '#d4509866' : '#d45098' },
+    { icon: <Wallet size={15} className="text-white" />, label: 'Wallet & Credits', color: isDark ? '#f8fafc' : '#161a21', bg: isDark ? '#10b98166' : '#10b981' },
+    { icon: <div className="w-6 h-6 text-white">🔔</div>, label: 'Notifications & Activity', color: isDark ? '#f8fafc' : '#161a21', bg: isDark ? '#4c5df966' : '#4c5df9' },
     { icon: <div className="w-6 h-6 text-white">✉️</div>, label: 'Message', color: isDark ? '#f8fafc' : '#161a21', bg: isDark ? '#a966ca66' : '#a966ca' },
     { icon: <div className="w-6 h-6 text-white">🚗</div>, label: 'My Trips', color: isDark ? '#f8fafc' : '#161a21', bg: isDark ? '#09a87b66' : '#09a87b' },
     { icon: <div className="w-6 h-6 text-white">⚙️</div>, label: 'Setting', color: isDark ? '#f8fafc' : '#161a21', bg: isDark ? '#9451d766' : '#9451d7' },
@@ -165,28 +169,49 @@ export function SettingsPage({ onBack, variant = 'dark', onAddPayment, onViewHis
         <div className="space-y-2">
           {(paymentMethods || []).map((pm: PaymentMethod) => {
             const isSelected = paymentMethod?.id === pm.id || pm.isDefault
+            const canRemove = pm.type !== 'cash' && (paymentMethods || []).length > 1
+
             return (
-              <button
+              <div
                 key={pm.id}
-                onClick={() => setPaymentMethod(pm)}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border active:opacity-90 text-left"
                 style={{ backgroundColor: cardBg, borderColor: isSelected ? '#4c5df9' : cardBorder }}
               >
-                <div className="w-9 h-7 rounded flex items-center justify-center flex-shrink-0" style={{ backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }}>
-                  <CreditCardIcon size={16} className={isDark ? 'text-white/80' : 'text-[#1c1f2a]'} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm" style={{ color: textColor }}>
-                    {pm.brand || pm.type} {pm.last4 ? `•••• ${pm.last4}` : ''}
+                <button
+                  onClick={() => setPaymentMethod(pm)}
+                  className="flex flex-1 items-center gap-3 text-left"
+                >
+                  <div className="w-9 h-7 rounded flex items-center justify-center flex-shrink-0" style={{ backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }}>
+                    <CreditCardIcon size={16} className={isDark ? 'text-white/80' : 'text-[#1c1f2a]'} />
                   </div>
-                  <div className="text-[10px]" style={{ color: isDark ? '#9fa1b0' : '#6b7280' }}>
-                    {pm.type === 'applepay' ? 'Apple Pay' : pm.type === 'cash' ? 'Cash' : 'Card'}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm" style={{ color: textColor }}>
+                      {pm.brand || pm.type} {pm.last4 ? `•••• ${pm.last4}` : ''}
+                    </div>
+                    <div className="text-[10px]" style={{ color: isDark ? '#9fa1b0' : '#6b7280' }}>
+                      {pm.type === 'applepay' ? 'Apple Pay' : pm.type === 'cash' ? 'Cash' : 'Card'}
+                    </div>
                   </div>
-                </div>
-                {isSelected && (
-                  <div className="text-xs px-2 py-0.5 rounded-full bg-[#4c5df9] text-white font-medium">Default</div>
+                  {isSelected && (
+                    <div className="text-xs px-2 py-0.5 rounded-full bg-[#4c5df9] text-white font-medium">Default</div>
+                  )}
+                </button>
+
+                {canRemove && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (confirm(`Remove ${pm.brand || pm.type} ending in ${pm.last4 || '****'}?`)) {
+                        removePaymentMethod(pm.id)
+                        showToast?.('Payment method removed', 'success')
+                      }
+                    }}
+                    className="ml-1 px-2 py-1 text-xs text-red-500 active:bg-red-500/10 rounded-lg"
+                  >
+                    Remove
+                  </button>
                 )}
-              </button>
+              </div>
             )
           })}
           {(!paymentMethods || paymentMethods.length === 0) && (
@@ -353,6 +378,12 @@ export function SettingsPage({ onBack, variant = 'dark', onAddPayment, onViewHis
                     } else {
                       setActivePanel('gift')
                     }
+                  } else if (item.label === 'Wallet & Credits') {
+                    if (onOpenWallet) onOpenWallet()
+                    else showToast?.('Opening Wallet & Credits...', 'info')
+                  } else if (item.label === 'Notifications & Activity') {
+                    if (onViewNotifications) onViewNotifications()
+                    else showToast?.('Opening Activity Center...', 'info')
                   } else if (item.label === 'Message') {
                     if (onOpenMessages) onOpenMessages()
                     else showToast?.('Opening messages...', 'info')
@@ -381,10 +412,15 @@ export function SettingsPage({ onBack, variant = 'dark', onAddPayment, onViewHis
                 </div>
                 <div className="flex-1 text-left">
                   <div 
-                    className="font-semibold text-[16px] tracking-[-0.2px]"
+                    className="font-semibold text-[16px] tracking-[-0.2px] flex items-center gap-2"
                     style={{ color: item.color, fontFamily: 'Sen, system-ui, sans-serif' }}
                   >
                     {item.label}
+                    {item.label === 'Notifications & Activity' && unreadCount > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-[17px] h-[17px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold tabular-nums ring-1 ring-white/70">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <ChevronRight size={18} style={{ color: isDark ? '#9fa1b0' : '#9fa1b0' }} />
