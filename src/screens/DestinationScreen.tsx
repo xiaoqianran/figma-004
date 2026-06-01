@@ -18,15 +18,21 @@ const savedPlaces: Location[] = [
   { address: 'Parents House', subtitle: '2213 Suburb Rd' },
 ]
 
-const recentPlaces: Location[] = [
-  { address: 'Coffee Shop', subtitle: '2.4 km away • Blue Bottle' },
-  { address: 'Whole Foods', subtitle: '1.1 km away' },
-]
-
 export function DestinationScreen({ onBack, onConfirmDestination, onSelectPlace, showToast }: DestinationScreenProps) {
   const { state, setDestination } = useBooking()
+  const { recentDestinations } = state
   const [searchQuery, setSearchQuery] = useState('')
   const [selected, setSelected] = useState<Location | null>(state.destination)
+
+  // Merge state recents (populated via setDestination in flows) + a couple defaults, deduped, capped at 5
+  const defaultRecentSeeds: Location[] = [
+    { address: 'Coffee Shop', subtitle: '2.4 km away • Blue Bottle' },
+    { address: 'Whole Foods', subtitle: '1.1 km away' },
+  ]
+  const recentPlaces: Location[] = [
+    ... (recentDestinations || []),
+    ... defaultRecentSeeds.filter(d => !(recentDestinations || []).some(r => r.address === d.address))
+  ].slice(0, 5)
 
   const handleSelect = (loc: Location) => {
     setSelected(loc)
@@ -113,7 +119,10 @@ export function DestinationScreen({ onBack, onConfirmDestination, onSelectPlace,
         {/* Recent */}
         <div className="mt-7">
           <div className="text-xs font-semibold text-gray-400 mb-2 px-1 tracking-wider">RECENT</div>
-          {recentPlaces.filter(p => p.address.toLowerCase().includes(searchQuery.toLowerCase())).map((place, idx) => {
+          {recentPlaces.filter(p => 
+            p.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (p.subtitle?.toLowerCase().includes(searchQuery.toLowerCase()))
+          ).map((place, idx) => {
             const isSelected = selected?.address === place.address
             return (
               <button 

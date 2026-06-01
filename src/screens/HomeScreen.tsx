@@ -16,7 +16,7 @@ interface HomeScreenProps {
 
 export function HomeScreen({ onBack: _onBack, onBookRide, onSearchDestination, onQuickDestination, onViewActiveRide }: HomeScreenProps) {
   const { state, setPreferredRideType } = useBooking()
-  const { user, activeRide, preferredRideType: selectedRideType = 'comfort' } = state
+  const { user, activeRide, preferredRideType: selectedRideType = 'comfort', recentDestinations = [] } = state
 
   const [pickup, setPickup] = useState('Current Location')
 
@@ -26,10 +26,20 @@ export function HomeScreen({ onBack: _onBack, onBookRide, onSearchDestination, o
     { id: 'xl' as const, label: 'XL', price: '$16.90', eta: '6 min', icon: '🚐' },
   ]
 
+  // Enhanced quick places with variety, ETA for realism (still call onQuickDestination)
   const quickPlaces = [
-    { label: 'Home', sub: '42 Oak Ave', icon: '🏠' },
-    { label: 'Work', sub: 'Downtown Tower', icon: '🏢' },
-    { label: 'Gym', sub: 'FitZone • 1.2km', icon: '🏋️' },
+    { label: 'Home', sub: '42 Oak Ave', icon: '🏠', eta: '2' },
+    { label: 'Work', sub: 'Downtown Tower', icon: '🏢', eta: '8' },
+    { label: 'Gym', sub: 'FitZone • 1.2km', icon: '🏋️', eta: '5' },
+    { label: 'Coffee', sub: 'Blue Bottle', icon: '☕', eta: '3' },
+  ]
+
+  // 3-4 tappable hotspots for richer interactive map (per "可点击热点")
+  const mapHotspots = [
+    { id: 'dt', label: 'Downtown', sub: '5 min', style: { top: '20%', left: '55%' } },
+    { id: 'ap', label: 'Airport', sub: '12 min', style: { bottom: '32%', right: '6%' }, surge: '1.4×' },
+    { id: 'md', label: 'Mission', sub: '4 min', style: { top: '52%', left: '8%' } },
+    { id: 'fb', label: 'Ferry Bldg', sub: '7 min', style: { top: '15%', right: '28%' } },
   ]
 
   return (
@@ -117,6 +127,23 @@ export function HomeScreen({ onBack: _onBack, onBookRide, onSearchDestination, o
           <Clock size={13} /> Peak hours
         </div>
 
+        {/* Interactive tappable hotspots (可点击热点) - subtle pill badges, press active states */}
+        {mapHotspots.map((h) => (
+          <button
+            key={h.id}
+            onClick={() => onQuickDestination?.({ label: h.label, sub: h.sub })}
+            className="absolute z-20 bg-white/95 text-[#1c1f2a] text-[10px] font-medium px-2 py-[2px] rounded-full shadow-sm border border-gray-200/70 flex items-center gap-1 active:scale-[0.93] active:bg-white active:shadow active:ring-1 active:ring-[#4c5df9]/30 transition-all select-none"
+            style={h.style as React.CSSProperties}
+            aria-label={`Quick destination: ${h.label}`}
+          >
+            <span>{h.label}</span>
+            <span className="text-emerald-600 text-[9px] font-normal tabular-nums tracking-tight">{h.sub}</span>
+            {h.surge && (
+              <span className="text-[8px] leading-none bg-orange-500 text-white px-1 rounded font-semibold ml-0.5 py-px"> {h.surge}</span>
+            )}
+          </button>
+        ))}
+
         {/* Current location badge */}
         <div 
           onClick={() => setPickup('Home • 42 Oak Ave')}
@@ -138,15 +165,48 @@ export function HomeScreen({ onBack: _onBack, onBookRide, onSearchDestination, o
             <button 
               key={i}
               onClick={() => onQuickDestination?.(p)}
-              className="flex-shrink-0 bg-white border border-gray-100 rounded-2xl px-4 py-3 min-w-[108px] text-left active:bg-gray-50"
+              className="flex-shrink-0 bg-white border border-gray-100 rounded-2xl px-4 py-3 min-w-[108px] text-left active:bg-gray-50 active:scale-[0.985] transition-transform"
             >
-              <div className="text-xl mb-0.5">{p.icon}</div>
+              <div className="flex items-start justify-between">
+                <div className="text-xl mb-0.5">{p.icon}</div>
+                {p.eta && <div className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 rounded mt-0.5 tabular-nums">{p.eta} min</div>}
+              </div>
               <div className="font-semibold text-sm">{p.label}</div>
-              <div className="text-[11px] text-gray-500 truncate">{p.sub}</div>
+              <div className="text-[11px] text-gray-500 truncate flex items-center gap-1">
+                {p.sub}
+                {i === 3 && <span className="inline-block w-1 h-1 bg-emerald-500 rounded-full" title="Live" />}
+              </div>
             </button>
           ))}
         </div>
       </div>
+
+      {/* Popular near you - dynamic from BookingContext recentDestinations + live/surge realism badges */}
+      {recentDestinations.length > 0 && (
+        <div className="px-5 pt-1 pb-1">
+          <div className="uppercase tracking-[1px] text-[10px] font-semibold text-gray-400 mb-1 px-0.5 flex items-center gap-1">
+            POPULAR NEAR YOU <span className="text-[9px] text-emerald-500 font-normal">• live</span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-0.5 -mx-1 px-1">
+            {recentDestinations.slice(0, 3).map((r, i) => (
+              <button
+                key={i}
+                onClick={() => onQuickDestination?.(r)}
+                className="flex-shrink-0 bg-white border border-gray-100 rounded-2xl px-3 py-1.5 min-w-[92px] text-left active:bg-gray-50 active:scale-[0.985] transition-transform"
+              >
+                <div className="font-medium text-xs flex items-center gap-1">
+                  📍 {r.address}
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full flex-shrink-0" />
+                </div>
+                <div className="text-[10px] text-gray-500 truncate flex items-center gap-1">
+                  {r.subtitle || 'Nearby'} <span className="text-emerald-600 text-[9px]">3 min</span>
+                  {i === 0 && <span className="text-[8px] bg-orange-100 text-orange-600 px-1 rounded">surge</span>}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Ride type selector */}
       <div className="px-5 pt-5 pb-2 flex-1">
