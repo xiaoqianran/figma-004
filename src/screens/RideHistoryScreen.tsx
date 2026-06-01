@@ -6,9 +6,18 @@ import { Card } from '../components/ui/Card'
 interface RideHistoryScreenProps {
   onBack?: () => void
   showToast?: (message: string, type?: 'success' | 'error' | 'info') => void
+  onRebook?: (ride: {
+    bookingId: string
+    rideName: string
+    price: number
+    destination: string
+    completedAt: string
+    rating?: number
+    tip?: number
+  }) => void
 }
 
-export function RideHistoryScreen({ onBack, showToast: _showToast }: RideHistoryScreenProps) {
+export function RideHistoryScreen({ onBack, showToast: _showToast, onRebook }: RideHistoryScreenProps) {
   const { state } = useBooking()
   const { completedRides, lastRating } = state
 
@@ -90,6 +99,20 @@ export function RideHistoryScreen({ onBack, showToast: _showToast }: RideHistory
                   )}
                   <div className="text-[10px] text-gray-400 mt-1.5 tracking-wide">Booking #{ride.bookingId}</div>
                 </div>
+              </div>
+
+              {/* Quick Rebook action - prominent emerald accent button per high-fidelity style */}
+              <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onRebook?.(ride)
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-emerald-500 active:bg-emerald-600 text-white text-sm font-semibold rounded-xl transition-all active:scale-[0.985] shadow-sm hover:bg-emerald-600"
+                  aria-label={`Book again ${ride.rideName}`}
+                >
+                  ↻ Book again
+                </button>
               </div>
             </Card>
           ))}
