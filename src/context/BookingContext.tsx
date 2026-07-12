@@ -1,5 +1,42 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react'
 
+// ---------------------------------------------------------------------------
+// Shared gift / promo code rules (single source of truth for Gift + Settings)
+// Invalid codes MUST NOT silently credit balance.
+// ---------------------------------------------------------------------------
+export const GIFT_CODE_AMOUNTS: Record<string, number> = {
+  WELCOME20: 20,
+  METEOR50: 50,
+  RIDO20: 20,
+  GIFT25: 25,
+  SAVE10: 10,
+  RIDE20: 8,
+  FIRST10: 10,
+  SAFE20: 20,
+  WEEKEND5: 5,
+}
+
+export type GiftCodeResult =
+  | { ok: true; code: string; amount: number }
+  | { ok: false; code: string; error: string }
+
+/** Pure validation — used by screens and tests. Does not mutate state. */
+export function resolveGiftCode(raw: string): GiftCodeResult {
+  const code = (raw || '').trim().toUpperCase()
+  if (!code) {
+    return { ok: false, code: '', error: 'Enter a promo code' }
+  }
+  const amount = GIFT_CODE_AMOUNTS[code]
+  if (amount == null || amount <= 0) {
+    return {
+      ok: false,
+      code,
+      error: `Invalid code "${code}". Try: WELCOME20, METEOR50, RIDO20 or GIFT25`,
+    }
+  }
+  return { ok: true, code, amount }
+}
+
 // Types
 export interface Location {
   address: string
@@ -15,6 +52,28 @@ export interface RideOption {
   eta: string
   rating: number
   seats: number
+}
+
+// Demo seeds for gallery previews when booking state is empty
+export const DEMO_SELECTED_RIDE: RideOption = {
+  id: 101,
+  name: 'Tesla Model 3',
+  type: 'Electric',
+  price: 12.4,
+  priceDisplay: '$12.40',
+  eta: '3 min',
+  rating: 4.98,
+  seats: 4,
+}
+
+export const DEMO_DESTINATION: Location = {
+  address: 'Airport Terminal 2',
+  subtitle: 'SFO International',
+}
+
+export const DEMO_PICKUP: Location = {
+  address: 'Current Location',
+  subtitle: '123 Market Street, SF',
 }
 
 export interface ActivityItem {
@@ -129,6 +188,9 @@ type BookingAction =
   | { type: 'ADD_COMPLETED_RIDE'; payload: { bookingId: string; rideName: string; price: number; destination: string; rating?: number; tip?: number } }
   | { type: 'ADD_GIFT_BALANCE'; payload: number }
   | { type: 'SET_GIFT_BALANCE'; payload: number }
+  // Gallery / isolated preview seeds (no-ops when real data already present)
+  | { type: 'SEED_DEMO_BOOKING' }
+  | { type: 'SEED_DEMO_ACTIVE_RIDE' }
   // Activity center actions
   | { type: 'ADD_ACTIVITY'; payload: { type: ActivityItem['type']; title: string; description: string; meta?: ActivityItem['meta'] } }
   | { type: 'MARK_ACTIVITY_READ'; payload: string } // id
@@ -338,29 +400,45 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
       }
 
     case 'COMPLETE_RIDE': {
-      // Archive current active ride into history if present
+      // Archive current active ride into history if present, carrying rating/tip from lastRating when matching
       let newCompleted = state.completedRides
       let newActivities = state.activities
       if (state.activeRide) {
         const ar = state.activeRide
-        const already = state.completedRides.some(r => r.bookingId === ar.bookingId)
-        if (!already) {
+        const matchedRating =
+          state.lastRating?.bookingId === ar.bookingId
+            ? state.lastRating
+            : null
+        const alreadyIdx = state.completedRides.findIndex(r => r.bookingId === ar.bookingId)
+        if (alreadyIdx === -1) {
           newCompleted = [{
             bookingId: ar.bookingId,
             rideName: ar.ride.name,
             price: ar.ride.price,
             destination: ar.destination.address,
             completedAt: 'Just now',
+            rating: matchedRating?.rating,
+            tip: matchedRating?.tip,
           }, ...state.completedRides].slice(0, 12)
+        } else if (matchedRating) {
+          // Ride already archived (edge case) — still attach submitted rating/tip
+          newCompleted = state.completedRides.map((r, i) =>
+            i === alreadyIdx
+              ? { ...r, rating: matchedRating.rating, tip: matchedRating.tip }
+              : r
+          )
         }
         // Auto-log ride completion activity (makes Notifications feel alive)
         const alreadyAct = state.activities.some(a => a.meta?.bookingId === ar.bookingId && a.type === 'ride_completed')
         if (!alreadyAct) {
+          const ratingSuffix = matchedRating
+            ? ` • Rated ${matchedRating.rating}★`
+            : ''
           const rideCompleteAct: ActivityItem = {
             id: 'act_auto_' + Date.now().toString(36),
             type: 'ride_completed',
             title: 'Ride completed',
-            description: `${ar.ride.name} to ${ar.destination.address} • $${ar.ride.price.toFixed(2)}`,
+            description: `${ar.ride.name} to ${ar.destination.address} • $${ar.ride.price.toFixed(2)}${ratingSuffix}`,
             time: 'Just now',
             read: false,
             meta: { bookingId: ar.bookingId },
@@ -378,15 +456,29 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
       }
     }
 
-    case 'SUBMIT_RATING':
+    case 'SUBMIT_RATING': {
+      const bookingId = state.activeRide?.bookingId
+      const { rating, tip } = action.payload
+      // If this booking was already archived, patch rating/tip onto history now
+      let completedRides = state.completedRides
+      if (bookingId) {
+        const exists = completedRides.some(r => r.bookingId === bookingId)
+        if (exists) {
+          completedRides = completedRides.map(r =>
+            r.bookingId === bookingId ? { ...r, rating, tip } : r
+          )
+        }
+      }
       return {
         ...state,
         lastRating: {
-          rating: action.payload.rating,
-          tip: action.payload.tip,
-          bookingId: state.activeRide?.bookingId,
+          rating,
+          tip,
+          bookingId,
         },
+        completedRides,
       }
+    }
 
     case 'RESET_BOOKING':
       return {
@@ -435,6 +527,45 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
         ...state,
         giftBalance: Math.max(0, action.payload || 0),
       }
+
+    case 'SEED_DEMO_BOOKING': {
+      // Gallery Booking Confirm: ensure selected ride + destination exist without clobbering live flow data
+      if (state.selectedRide && state.destination) return state
+      return {
+        ...state,
+        pickup: state.pickup || DEMO_PICKUP,
+        destination: state.destination || DEMO_DESTINATION,
+        selectedRide: state.selectedRide || DEMO_SELECTED_RIDE,
+      }
+    }
+
+    case 'SEED_DEMO_ACTIVE_RIDE': {
+      // Gallery Ride Tracking: ensure an active ride exists for populated preview
+      if (state.activeRide) return state
+      const ride = state.selectedRide || DEMO_SELECTED_RIDE
+      const destination = state.destination || DEMO_DESTINATION
+      const pickup = state.pickup || DEMO_PICKUP
+      return {
+        ...state,
+        pickup,
+        destination,
+        selectedRide: ride,
+        activeRide: {
+          bookingId: 'BK' + Math.floor(100000 + Math.random() * 900000),
+          ride,
+          status: 'driver_enroute',
+          driver: {
+            name: 'Alex Rivera',
+            rating: 4.92,
+            car: ride.name.includes('Tesla') ? 'Tesla Model 3 • White' : `${ride.name} • Silver`,
+            plate: '7ABC452',
+            etaMinutes: parseInt(ride.eta) || 4,
+          },
+          pickup,
+          destination,
+        },
+      }
+    }
 
     case 'ADD_ACTIVITY': {
       const timeStr = 'Just now'
@@ -511,6 +642,14 @@ interface BookingContextValue {
   giftBalance: number
   addGiftBalance: (amount: number) => void
   setGiftBalance: (amount: number) => void
+  /**
+   * Validate + apply a gift/promo code. Rejects invalid codes without crediting.
+   * Returns the pure resolveGiftCode result after any successful balance mutation.
+   */
+  redeemGiftCode: (raw: string) => GiftCodeResult
+  // Gallery seeds (safe no-ops when real data already present)
+  seedDemoBooking: () => void
+  seedDemoActiveRide: () => void
   // Activity / Notifications center (lightweight, tappable history)
   activities: ActivityItem[]
   unreadCount: number
@@ -642,6 +781,25 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     giftBalance: state.giftBalance || 0,
     addGiftBalance: (amount) => dispatch({ type: 'ADD_GIFT_BALANCE', payload: amount }),
     setGiftBalance: (amount) => dispatch({ type: 'SET_GIFT_BALANCE', payload: amount }),
+
+    redeemGiftCode: (raw: string) => {
+      const result = resolveGiftCode(raw)
+      if (!result.ok) return result
+      dispatch({ type: 'ADD_GIFT_BALANCE', payload: result.amount })
+      dispatch({
+        type: 'ADD_ACTIVITY',
+        payload: {
+          type: 'promo',
+          title: 'Promo code applied',
+          description: `${result.code} redeemed — $${result.amount} added to your gift balance.`,
+          meta: { amount: result.amount },
+        },
+      })
+      return result
+    },
+
+    seedDemoBooking: () => dispatch({ type: 'SEED_DEMO_BOOKING' }),
+    seedDemoActiveRide: () => dispatch({ type: 'SEED_DEMO_ACTIVE_RIDE' }),
 
     // Activity center (lightweight)
     activities: state.activities || [],
@@ -778,6 +936,9 @@ export function useBooking() {
       giftBalance: 0,
       addGiftBalance: () => {},
       setGiftBalance: () => {},
+      redeemGiftCode: (raw: string) => resolveGiftCode(raw),
+      seedDemoBooking: () => {},
+      seedDemoActiveRide: () => {},
       activities: [],
       unreadCount: 0,
       addActivity: () => {},

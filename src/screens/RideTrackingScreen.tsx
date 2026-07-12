@@ -12,6 +12,8 @@ interface RideTrackingScreenProps {
   onCancel?: (reason?: string) => void
   onRideCompleted?: () => void
   showToast?: (message: string, type?: 'success' | 'error' | 'info') => void
+  /** Optional recovery when no active ride (gallery empty shell) */
+  onBookRide?: () => void
 }
 
 const statusLabels: Record<RideStatus, string> = {
@@ -38,8 +40,8 @@ const statusSteps: { key: RideStatus; label: string; icon: React.ReactNode; shor
   { key: 'completed', label: 'Complete', icon: <CheckCircle size={14} />, short: 'Done' },
 ]
 
-export function RideTrackingScreen({ onBack, onComplete, onCancel, onRideCompleted, showToast }: RideTrackingScreenProps) {
-  const { state, updateRideStatus } = useBooking()
+export function RideTrackingScreen({ onBack, onComplete, onCancel, onRideCompleted, showToast, onBookRide }: RideTrackingScreenProps) {
+  const { state, updateRideStatus, seedDemoActiveRide } = useBooking()
   const { activeRide } = state
 
   const [manualMode, setManualMode] = useState(false)
@@ -60,6 +62,13 @@ export function RideTrackingScreen({ onBack, onComplete, onCancel, onRideComplet
     'Price too high',
     'Other',
   ] as const
+
+  // Gallery previews: seed a realistic active ride when none exists (no-op during live tracking)
+  useEffect(() => {
+    if (!activeRide) {
+      seedDemoActiveRide()
+    }
+  }, [activeRide, seedDemoActiveRide])
 
   // Auto-advance ride status for demo every ~6s (paused in manualMode for delightful control)
   useEffect(() => {
@@ -155,8 +164,19 @@ export function RideTrackingScreen({ onBack, onComplete, onCancel, onRideComplet
           <Navigation size={32} className="text-gray-400" />
         </div>
         <div className="font-semibold text-xl">No active ride</div>
-        <p className="text-gray-500 mt-2 text-sm max-w-[220px]">Your completed rides and summaries will appear here after booking.</p>
-        <Button onClick={onBack} variant="secondary" className="mt-6">Return to Home</Button>
+        <p className="text-gray-500 mt-2 text-sm max-w-[220px]">
+          Your completed rides and summaries will appear here after booking.
+        </p>
+        <div className="mt-6 flex flex-col gap-2 w-full max-w-[240px]">
+          <Button onClick={() => seedDemoActiveRide()} fullWidth>
+            Load demo tracking
+          </Button>
+          {(onBookRide || onBack) && (
+            <Button onClick={onBookRide || onBack} variant="secondary" fullWidth>
+              {onBookRide ? 'Book a ride' : 'Return to Home'}
+            </Button>
+          )}
+        </div>
       </div>
     )
   }

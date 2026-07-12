@@ -296,7 +296,18 @@ export default function App() {
         return <AddCardScreen variant="light" onBack={() => setCurrentScreen('splash-dark')} onAddCardSuccess={() => startPaymentProcessing('Card')} />
       
       case 'card-scan-dark':
-        return <CardScanScreen variant="dark" onBack={() => setCurrentScreen('splash-dark')} />
+        return (
+          <CardScanScreen
+            variant="dark"
+            onBack={() => setCurrentScreen('add-card-dark')}
+            showToast={showToast}
+            onScanSuccess={() => {
+              showToast('Card scanned — saved as payment method', 'success')
+              setTimeout(() => setCurrentScreen('wallet'), 700)
+            }}
+            onEnterManually={() => setCurrentScreen('add-card-dark')}
+          />
+        )
       
       case 'destination':
         return <DestinationScreen onBack={() => setCurrentScreen('splash-dark')} onSelectPlace={startFindingDrivers} />
@@ -316,9 +327,37 @@ export default function App() {
         )
       
       case 'settings-dark':
-        return <SettingsPage variant="dark" onBack={() => setCurrentScreen('home')} onViewHistory={() => setCurrentScreen('ride-history')} onAddPayment={() => setCurrentScreen('add-card-dark')} onOpenGift={() => setCurrentScreen('gift-code')} onViewGift={() => setCurrentScreen('gift-code')} onViewNotifications={() => setCurrentScreen('notifications')} onOpenWallet={() => setCurrentScreen('wallet')} />
+        return (
+          <SettingsPage
+            variant="dark"
+            onBack={() => setCurrentScreen('home')}
+            onViewHistory={() => setCurrentScreen('ride-history')}
+            onAddPayment={() => setCurrentScreen('add-card-dark')}
+            onOpenGift={() => setCurrentScreen('gift-code')}
+            onViewGift={() => setCurrentScreen('gift-code')}
+            onViewNotifications={() => setCurrentScreen('notifications')}
+            onOpenWallet={() => setCurrentScreen('wallet')}
+            onOpenMessages={() => setCurrentScreen('messages')}
+            onShowHelp={() => showToast('Help center opened', 'info')}
+            showToast={showToast}
+          />
+        )
       case 'settings-light':
-        return <SettingsPage variant="light" onBack={() => setCurrentScreen('home')} onViewHistory={() => setCurrentScreen('ride-history')} onAddPayment={() => setCurrentScreen('add-card-light')} onOpenGift={() => setCurrentScreen('gift-code')} onViewGift={() => setCurrentScreen('gift-code')} onViewNotifications={() => setCurrentScreen('notifications')} onOpenWallet={() => setCurrentScreen('wallet')} />
+        return (
+          <SettingsPage
+            variant="light"
+            onBack={() => setCurrentScreen('home')}
+            onViewHistory={() => setCurrentScreen('ride-history')}
+            onAddPayment={() => setCurrentScreen('add-card-light')}
+            onOpenGift={() => setCurrentScreen('gift-code')}
+            onViewGift={() => setCurrentScreen('gift-code')}
+            onViewNotifications={() => setCurrentScreen('notifications')}
+            onOpenWallet={() => setCurrentScreen('wallet')}
+            onOpenMessages={() => setCurrentScreen('messages')}
+            onShowHelp={() => showToast('Help center opened', 'info')}
+            showToast={showToast}
+          />
+        )
       
       case 'rating-tips':
         return <RatingAndTipsPage variant="dark" onBack={() => setCurrentScreen('home')} />
@@ -327,23 +366,44 @@ export default function App() {
         return <MessagesPage variant="dark" onBack={() => setCurrentScreen('home')} />
       
       case 'gift-code':
-        return <GiftCodePage variant="dark" onBack={() => setCurrentScreen('home')} showToast={showToast} onRedeem={(_code, _amount) => { /* gallery isolated demo uses internal */ }} onViewWallet={() => setCurrentScreen('wallet')} />
+        return (
+          <GiftCodePage
+            variant="dark"
+            onBack={() => setCurrentScreen('home')}
+            showToast={showToast}
+            onRedeem={(code, amount) => {
+              // Balance is applied inside GiftCodePage via shared redeemGiftCode
+              showToast(`Code ${code} redeemed — $${amount} added`, 'success')
+            }}
+            onViewWallet={() => setCurrentScreen('wallet')}
+          />
+        )
       
       case 'car-result-v2':
         return <CarResultV2Screen onBack={() => setCurrentScreen('home')} />
       
       // Newly wired complete-coverage gallery screens
       case 'booking-confirm':
-        return <BookingConfirmScreen onBack={() => setCurrentScreen('car-result')} onConfirm={() => { showToast('Booking confirmed (demo)'); setCurrentScreen('ride-tracking') }} onAddPayment={() => setCurrentScreen('add-card-light')} />
+        return (
+          <BookingConfirmScreen
+            onBack={() => setCurrentScreen('car-result')}
+            onConfirm={() => { showToast('Booking confirmed (demo)'); setCurrentScreen('ride-tracking') }}
+            onAddPayment={() => setCurrentScreen('add-card-light')}
+            onFindRides={() => setCurrentScreen('destination')}
+          />
+        )
       
       case 'ride-tracking':
-        return <RideTrackingScreen 
-          onBack={() => setCurrentScreen('home')} 
-          onComplete={() => { showToast('Ride completed'); setCurrentScreen('rating-tips') }}
-          onCancel={() => setCurrentScreen('home')}
-          onRideCompleted={() => setCurrentScreen('rating-tips')}
-          showToast={showToast}
-        />
+        return (
+          <RideTrackingScreen 
+            onBack={() => setCurrentScreen('home')} 
+            onComplete={() => { showToast('Ride completed'); setCurrentScreen('rating-tips') }}
+            onCancel={() => setCurrentScreen('home')}
+            onRideCompleted={() => setCurrentScreen('rating-tips')}
+            onBookRide={() => setCurrentScreen('destination')}
+            showToast={showToast}
+          />
+        )
       
       case 'profile':
         return <ProfileScreen 

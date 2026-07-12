@@ -1,28 +1,22 @@
 import { useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
+import { useBooking, GIFT_CODE_AMOUNTS } from '../context/BookingContext'
 
 interface GiftCodePageProps {
   onBack?: () => void
   variant?: 'light' | 'dark'
   showToast?: (message: string, type?: 'success' | 'error' | 'info') => void
+  /** Called after a successful redeem (balance already updated in context). Parent should only toast/navigate — not re-credit. */
   onRedeem?: (code: string, amount: number) => void
   onViewWallet?: () => void
 }
 
 export function GiftCodePage({ onBack, variant = 'dark', showToast, onRedeem, onViewWallet }: GiftCodePageProps) {
   const isDark = variant === 'dark'
+  const { redeemGiftCode, giftBalance } = useBooking()
   const [code, setCode] = useState('RIDO20')
   const [redeemed, setRedeemed] = useState(false)
   const [success, setSuccess] = useState<{ code: string; amount: number } | null>(null)
-
-  // Supported demo codes -> credit amounts (case-insensitive match on redeem)
-  const validCodes: Record<string, number> = {
-    'WELCOME20': 20,
-    'METEOR50': 50,
-    'RIDO20': 20,
-    'GIFT25': 25,
-    'SAVE10': 10,
-  }
 
   const bg = isDark ? '#121826' : '#f8fafc'
   const textColor = isDark ? '#f8fafc' : '#161a21'
@@ -30,25 +24,26 @@ export function GiftCodePage({ onBack, variant = 'dark', showToast, onRedeem, on
   const inputBg = isDark ? '#1e293b' : '#f1f3f5'
   const successGreen = '#16a34a'
 
+  const demoHints = Object.keys(GIFT_CODE_AMOUNTS).slice(0, 4).join(' • ')
+
   const handleRedeem = () => {
     const trimmed = code.trim()
     if (!trimmed) return
 
-    const upper = trimmed.toUpperCase()
-    const amount = validCodes[upper] || 0
+    const result = redeemGiftCode(trimmed)
 
-    if (amount > 0) {
+    if (result.ok) {
       setRedeemed(true)
-      // Parent (RideshareApp or gallery) handles actual credit via context
-      onRedeem?.(upper, amount)
+      // Parent (RideshareApp or gallery) handles toast/nav only — balance already applied
+      onRedeem?.(result.code, result.amount)
 
       setTimeout(() => {
         setRedeemed(false)
-        setSuccess({ code: upper, amount })
+        setSuccess({ code: result.code, amount: result.amount })
         setCode('')
       }, 650)
     } else {
-      const msg = `Invalid code "${upper}". Try: WELCOME20, METEOR50, RIDO20 or GIFT25`
+      const msg = result.error
       if (showToast) {
         showToast(msg, 'error')
       } else {
@@ -78,7 +73,14 @@ export function GiftCodePage({ onBack, variant = 'dark', showToast, onRedeem, on
         >
           <ArrowLeft size={20} color={isDark ? '#f8fafc' : '#161a21'} />
         </button>
-        <h1 className="text-[20px] font-semibold" style={{ fontFamily: 'Sen, system-ui, sans-serif' }}>Gift Code</h1>
+        <div className="flex-1">
+          <h1 className="text-[20px] font-semibold" style={{ fontFamily: 'Sen, system-ui, sans-serif' }}>Gift Code</h1>
+          {giftBalance > 0 && (
+            <div className="text-[11px] font-medium" style={{ color: successGreen }}>
+              Balance: ${giftBalance}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 px-6 flex flex-col">
@@ -109,7 +111,7 @@ export function GiftCodePage({ onBack, variant = 'dark', showToast, onRedeem, on
               />
             </div>
             <div className="mt-2 text-[11px] px-1" style={{ color: muted }}>
-              Try: WELCOME20 • METEOR50 • RIDO20 • GIFT25
+              Try: {demoHints}
             </div>
           </div>
         )}
@@ -129,7 +131,7 @@ export function GiftCodePage({ onBack, variant = 'dark', showToast, onRedeem, on
                 Promo code <span className="font-mono">{success.code}</span> applied successfully
               </div>
               <div className="mt-4 text-xs px-3 py-1 rounded-full inline-block" style={{ backgroundColor: isDark ? '#1e293b' : '#f1f3f5', color: muted }}>
-                Balance updated in Profile &amp; Settings
+                Balance updated in Profile, Settings &amp; Wallet
               </div>
             </div>
           ) : (
@@ -167,7 +169,6 @@ export function GiftCodePage({ onBack, variant = 'dark', showToast, onRedeem, on
             {onViewWallet && (
               <button 
                 onClick={() => {
-                  // Optional: parent can choose to keep or navigate away
                   onViewWallet()
                 }}
                 className="w-full h-[54px] rounded-2xl border border-[#4c5df9] text-[#4c5df9] text-[17px] font-semibold active:bg-[#f0f4ff] transition"
@@ -195,9 +196,9 @@ export function GiftCodePage({ onBack, variant = 'dark', showToast, onRedeem, on
             <button 
               onClick={() => {
                 if (showToast) {
-                  showToast('Supported codes: WELCOME20 ($20), METEOR50 ($50), etc. (demo)', 'info')
+                  showToast(`Supported codes: ${demoHints} (demo)`, 'info')
                 } else {
-                  alert('Supported demo codes: WELCOME20, METEOR50, RIDO20, GIFT25 (demo)')
+                  alert(`Supported demo codes: ${demoHints}`)
                 }
               }}
               className="w-full text-center mt-4 text-sm underline"

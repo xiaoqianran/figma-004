@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ArrowLeft, Users, Star, CreditCard } from 'lucide-react'
 import { useBooking } from '../context/BookingContext'
 import { StatusBar } from '../components/ui/StatusBar'
@@ -10,18 +10,43 @@ interface BookingConfirmScreenProps {
   onBack?: () => void
   onConfirm?: () => void
   onAddPayment?: () => void
+  /** Optional recovery path when no live booking exists (gallery / empty shell) */
+  onFindRides?: () => void
 }
 
-export function BookingConfirmScreen({ onBack, onConfirm, onAddPayment }: BookingConfirmScreenProps) {
-  const { state, setPaymentMethod, giftBalance } = useBooking()
+export function BookingConfirmScreen({ onBack, onConfirm, onAddPayment, onFindRides }: BookingConfirmScreenProps) {
+  const { state, setPaymentMethod, giftBalance, seedDemoBooking } = useBooking()
   const { destination, selectedRide, paymentMethod, pickup, paymentMethods } = state
 
   const [isFareOpen, setIsFareOpen] = useState(false)
 
+  // Gallery previews: seed realistic demo booking when none is selected (no-op in live flow)
+  useEffect(() => {
+    if (!selectedRide || !destination) {
+      seedDemoBooking()
+    }
+  }, [selectedRide, destination, seedDemoBooking])
+
+  // Brief empty shell only before seed lands; always offer recovery
   if (!selectedRide || !destination) {
     return (
-      <div className="screen bg-white flex items-center justify-center">
-        <div className="text-center text-gray-500">No ride selected</div>
+      <div className="screen bg-white flex flex-col items-center justify-center px-8 text-center">
+        <StatusBar variant="light" />
+        <div className="text-4xl mb-3">🚗</div>
+        <div className="font-semibold text-lg text-[#1c1f2a]">No ride selected</div>
+        <p className="text-gray-500 text-sm mt-2 max-w-[240px]">
+          Choose a destination and ride option to confirm booking.
+        </p>
+        <div className="mt-6 flex flex-col gap-2 w-full max-w-[240px]">
+          <Button fullWidth onClick={() => seedDemoBooking()}>
+            Load demo booking
+          </Button>
+          {(onFindRides || onBack) && (
+            <Button fullWidth variant="secondary" onClick={onFindRides || onBack}>
+              {onFindRides ? 'Find rides' : 'Go back'}
+            </Button>
+          )}
+        </div>
       </div>
     )
   }
