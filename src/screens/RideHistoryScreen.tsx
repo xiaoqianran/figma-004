@@ -21,7 +21,21 @@ export function RideHistoryScreen({ onBack, showToast: _showToast, onRebook }: R
   const { state } = useBooking()
   const { completedRides, lastRating } = state
 
-  const allRides = [...completedRides]
+  // Merge lastRating into matching history entry (display safety net if archive raced ahead of rating)
+  const allRides = completedRides.map((ride) => {
+    if (
+      lastRating?.bookingId &&
+      ride.bookingId === lastRating.bookingId &&
+      (ride.rating == null || ride.tip == null)
+    ) {
+      return {
+        ...ride,
+        rating: ride.rating ?? lastRating.rating,
+        tip: ride.tip ?? lastRating.tip,
+      }
+    }
+    return ride
+  })
   // Promote lastRating into history view if present and not already reflected
   if (lastRating && lastRating.bookingId && !allRides.some(r => r.bookingId === lastRating.bookingId)) {
     allRides.unshift({
@@ -82,18 +96,21 @@ export function RideHistoryScreen({ onBack, showToast: _showToast, onRebook }: R
                     </div>
                   </div>
 
-                  {(ride.rating || lastRating) && (
-                    <div className="mt-3 flex items-center gap-2 text-sm">
+                  {/* Only show rating/tip belonging to THIS ride (never bleed lastRating onto other bookings) */}
+                  {ride.rating != null && (
+                    <div className="mt-3 flex items-center gap-2 text-sm" data-testid={`ride-rating-${ride.bookingId}`}>
                       <div className="flex items-center gap-0.5 text-amber-500">
-                        {Array.from({ length: Math.floor(ride.rating || lastRating?.rating || 5) }).map((_, i) => (
+                        {Array.from({ length: Math.floor(ride.rating) }).map((_, i) => (
                           <Star key={i} size={15} fill="currentColor" />
                         ))}
                       </div>
                       <div className="text-gray-500 text-xs font-medium">
-                        {ride.rating || lastRating?.rating || 5}.0
+                        {ride.rating}.0
                       </div>
-                      {ride.tip || lastRating?.tip ? (
-                        <div className="ml-2 text-emerald-600 text-xs font-medium bg-emerald-50 px-2 py-px rounded">+${(ride.tip || lastRating?.tip || 0).toFixed(0)} tip</div>
+                      {ride.tip != null && ride.tip > 0 ? (
+                        <div className="ml-2 text-emerald-600 text-xs font-medium bg-emerald-50 px-2 py-px rounded" data-testid={`ride-tip-${ride.bookingId}`}>
+                          +${ride.tip.toFixed(0)} tip
+                        </div>
                       ) : null}
                     </div>
                   )}

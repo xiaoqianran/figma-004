@@ -279,7 +279,11 @@ describe('Gift Code Redemption Flow (basic render + redeem button)', () => {
   it('calls onRedeem with uppercased valid code when Redeem button clicked', async () => {
     const user = userEvent.setup()
     const onRedeem = vi.fn()
-    render(<GiftCodePage onBack={vi.fn()} onRedeem={onRedeem} variant="dark" />)
+    render(
+      <BookingProvider>
+        <GiftCodePage onBack={vi.fn()} onRedeem={onRedeem} variant="dark" />
+      </BookingProvider>
+    )
 
     const input = screen.getByPlaceholderText(/Enter code/i)
     const redeemBtn = screen.getByRole('button', { name: /Redeem Code/i })
@@ -293,7 +297,11 @@ describe('Gift Code Redemption Flow (basic render + redeem button)', () => {
 
   it('shows success UI after redeeming a valid code (no crash, success message appears)', async () => {
     const user = userEvent.setup()
-    render(<GiftCodePage onBack={vi.fn()} onRedeem={vi.fn()} />)
+    render(
+      <BookingProvider>
+        <GiftCodePage onBack={vi.fn()} onRedeem={vi.fn()} />
+      </BookingProvider>
+    )
 
     const input = screen.getByPlaceholderText(/Enter code/i)
     await user.clear(input)
@@ -394,7 +402,7 @@ describe('Activity / Notifications rendering (context-driven)', () => {
     // Seed activities from initialState include these titles (some titles like "Ride completed" appear multiple times)
     expect(screen.getByText(/Driver arrived/i)).toBeInTheDocument()
     expect(screen.getAllByText(/Ride completed/i).length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText(/Promo code applied/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Promo code applied/i).length).toBeGreaterThanOrEqual(1)
   })
 
   it('NotificationsScreen filter tabs exist and can switch (rides/offers)', async () => {
@@ -450,6 +458,12 @@ describe('BookingContext rebookRide + gift balance helpers (via hook + provider)
     const { result } = renderHook(() => useBooking(), {
       wrapper: ({ children }) => <BookingProvider>{children}</BookingProvider>,
     })
+
+    // Reset any restored balance so the assertion is absolute and stable
+    act(() => {
+      result.current.setGiftBalance(0)
+    })
+    await waitFor(() => expect(result.current.giftBalance).toBe(0))
 
     act(() => {
       result.current.addGiftBalance(25)

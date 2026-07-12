@@ -72,7 +72,6 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
     resetBooking,
     submitRating,
     rebookRide,
-    addGiftBalance,
     addActivity,
   } = useBooking()
 
@@ -149,11 +148,25 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
   }
 
   const handleRideConfirmed = () => {
+    // Ensure destination survives Results → Confirm (re-set from context if still present)
+    if (state.destination) {
+      setDestination(state.destination)
+    }
+    if (state.selectedRide) {
+      selectRide(state.selectedRide)
+    }
     navigateTo('booking-confirm')
   }
 
   // Booking confirmation -> payment or direct
   const handleBookingConfirm = async () => {
+    // Guard: require destination + selected ride before creating active ride
+    if (!state.selectedRide || !state.destination) {
+      showToastInApp('Select a ride and destination first', 'error')
+      navigateTo('car-results')
+      return
+    }
+
     if (!state.paymentMethod) {
       navigateTo('add-payment')
       return
@@ -234,16 +247,9 @@ export function RideshareApp({ initialView = 'splash' }: RideshareAppProps) {
     }
   }
 
+  // GiftCodePage already applies balance + activity via context.redeemGiftCode —
+  // parent only provides flow feedback (no double-credit).
   const handleGiftRedeem = (code: string, amount: number) => {
-    addGiftBalance(amount)
-    // Log to Activity Center so Notifications feels alive + connected to real actions
-    addActivity?.({ 
-      type: 'promo', 
-      title: 'Promo code applied', 
-      description: `${code} redeemed — $${amount} added to your gift balance.`, 
-      meta: { amount } 
-    })
-    // Local toast for full-flow feedback (GiftCodePage also shows its own success panel)
     showToastInApp(`Code ${code} redeemed! $${amount} added to wallet`, 'success')
   }
 

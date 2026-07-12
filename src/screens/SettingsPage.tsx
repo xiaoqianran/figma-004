@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react'
 import { ArrowLeft, ChevronRight, CreditCard as CreditCardIcon, Plus, Gift, X, Wallet } from 'lucide-react'
-import { useBooking, PaymentMethod } from '../context/BookingContext'
+import { useBooking, PaymentMethod, GIFT_CODE_AMOUNTS } from '../context/BookingContext'
 
 interface SettingsPageProps {
   onBack?: () => void
@@ -26,7 +26,7 @@ interface MenuItem {
 }
 
 export function SettingsPage({ onBack, variant = 'dark', onAddPayment, onViewHistory, showToast, onOpenMessages, onOpenGift, onViewGift, onShowHelp, onViewNotifications, onOpenWallet }: SettingsPageProps) {
-  const { state, setPaymentMethod, removePaymentMethod, setNotificationsEnabled, setTheme, updateUser, addGiftBalance, unreadCount } = useBooking()
+  const { state, setPaymentMethod, removePaymentMethod, setNotificationsEnabled, setTheme, updateUser, redeemGiftCode, unreadCount } = useBooking()
   const { user, paymentMethods, paymentMethod, preferences, giftBalance = 0 } = state
 
   // Theme from context pref takes precedence so changing it affects this screen live
@@ -48,13 +48,15 @@ export function SettingsPage({ onBack, variant = 'dark', onAddPayment, onViewHis
 
   const handleRedeemGift = () => {
     if (!giftCode.trim()) return
-    const upper = giftCode.trim().toUpperCase()
-    // Reuse similar demo amounts as GiftCodePage for consistency
-    const amount = ({ 'WELCOME20': 20, 'METEOR50': 50, 'RIDO20': 20, 'GIFT25': 25, 'SAVE10': 10, 'RIDE20': 8, 'FIRST10': 10, 'SAFE20': 20, 'WEEKEND5': 5 } as Record<string, number>)[upper] || 8
+    // Shared rules: invalid codes rejected with feedback — never silent $ credit
+    const result = redeemGiftCode(giftCode)
+    if (!result.ok) {
+      showToast?.(result.error, 'error')
+      return
+    }
     setGiftRedeemed(true)
     setTimeout(() => {
-      addGiftBalance?.(amount)
-      showToast?.(`Gift code "${upper}" redeemed! $${amount} credit added (demo)`, 'success')
+      showToast?.(`Gift code "${result.code}" redeemed! $${result.amount} credit added`, 'success')
       setGiftRedeemed(false)
       setGiftCode('')
       setActivePanel(null)
@@ -288,14 +290,14 @@ export function SettingsPage({ onBack, variant = 'dark', onAddPayment, onViewHis
                 <div className="px-1 text-xs uppercase tracking-widest font-medium mb-1.5" style={{ color: isDark ? '#9fa1b0' : '#6b7280' }}>
                   POPULAR PROMOS
                 </div>
-                {['FIRST10', 'SAFE20', 'WEEKEND5'].map((code) => (
+                {(['FIRST10', 'SAFE20', 'WEEKEND5'] as const).map((code) => (
                   <button 
                     key={code} 
-                    onClick={() => { setGiftCode(code); showToast?.(`Code ${code} ready — tap Redeem`, 'info') }}
+                    onClick={() => { setGiftCode(code); showToast?.(`Code ${code} ($${GIFT_CODE_AMOUNTS[code]}) ready — tap Redeem`, 'info') }}
                     className="w-full text-left px-4 py-3 rounded-2xl flex items-center justify-between active:opacity-90 text-sm"
                     style={{ backgroundColor: cardBg, border: `1px solid ${cardBorder}` }}
                   >
-                    <span style={{ fontFamily: 'monospace' }}>{code}</span>
+                    <span style={{ fontFamily: 'monospace' }}>{code} · ${GIFT_CODE_AMOUNTS[code]}</span>
                     <span style={{ color: '#4c5df9' }}>Use →</span>
                   </button>
                 ))}

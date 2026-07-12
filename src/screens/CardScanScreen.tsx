@@ -1,20 +1,63 @@
-
+import { useState } from 'react'
 import { Info } from 'lucide-react'
 import { StatusBar } from '../components/ui/StatusBar'
 import { TopBar } from '../components/ui/TopBar'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { useBooking, PaymentMethod } from '../context/BookingContext'
 
 interface CardScanScreenProps {
   onBack?: () => void
   variant?: 'dark' | 'light'
-  showToast?: (message: string) => void
+  showToast?: (message: string, type?: 'success' | 'error' | 'info') => void
+  /** Fired after a successful scan adds a payment method to context */
+  onScanSuccess?: (method: PaymentMethod) => void
+  /** Optional hand-off to manual Add Card entry */
+  onEnterManually?: () => void
 }
 
-export function CardScanScreen({ onBack, variant = 'dark' }: CardScanScreenProps) {
+export function CardScanScreen({
+  onBack,
+  variant = 'dark',
+  showToast,
+  onScanSuccess,
+  onEnterManually,
+}: CardScanScreenProps) {
   const isDark = variant === 'dark'
   const bg = isDark ? '#121826' : '#f8fafc'
   const text = isDark ? '#fff' : '#1c1f2a'
+  const { addPaymentMethod } = useBooking()
+
+  const [scanning, setScanning] = useState(false)
+  const [scanned, setScanned] = useState(false)
+
+  const handleScanNow = async () => {
+    // Allow rescan when label shows "Scan again" — only block while a scan is in flight
+    if (scanning) return
+    const isRescan = scanned
+    setScanning(true)
+    setScanned(false)
+
+    // Simulate camera OCR capture of the card framed on screen
+    await new Promise((r) => setTimeout(r, 450))
+
+    // Distinct last4 on rescan so each scan is a real additional payment method
+    const last4 = isRescan ? String(1000 + Math.floor(Math.random() * 9000)) : '4523'
+    const method: PaymentMethod = {
+      id: 'pm_scan_' + Date.now().toString(36),
+      type: 'visa',
+      last4,
+      brand: 'Visa',
+      isDefault: true,
+    }
+
+    addPaymentMethod(method)
+    setScanning(false)
+    setScanned(true)
+
+    showToast?.(`Card •••• ${last4} scanned and added`, 'success')
+    onScanSuccess?.(method)
+  }
 
   return (
     <div className="screen flex flex-col" style={{ backgroundColor: bg, color: text }}>
@@ -46,7 +89,18 @@ export function CardScanScreen({ onBack, variant = 'dark' }: CardScanScreenProps
               <div className="absolute bottom-3 right-3 w-5 h-5 border-r-2 border-b-2 border-[#4c5df9]" />
 
               {/* Scanning line animation hint */}
-              <div className="absolute inset-x-6 h-px bg-[#4c5df9] opacity-60 animate-pulse" style={{ top: '42%' }} />
+              <div
+                className={`absolute inset-x-6 h-px bg-[#4c5df9] ${scanning ? 'opacity-100' : 'opacity-60 animate-pulse'}`}
+                style={{ top: '42%' }}
+              />
+
+              {scanned && (
+                <div className="absolute inset-0 bg-emerald-500/20 flex items-center justify-center">
+                  <div className="bg-emerald-600 text-white text-sm font-semibold px-3 py-1.5 rounded-full">
+                    ✓ Scan complete
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -63,11 +117,27 @@ export function CardScanScreen({ onBack, variant = 'dark' }: CardScanScreenProps
         </Card>
       </div>
 
-      {/* Bottom button */}
-      <div className="px-6 pb-8">
-        <Button fullWidth className="h-[54px] text-[17px]">
-          Scan Now
+      {/* Bottom buttons */}
+      <div className="px-6 pb-8 space-y-2.5">
+        <Button
+          fullWidth
+          className="h-[54px] text-[17px]"
+          onClick={handleScanNow}
+          disabled={scanning}
+          aria-label="Scan Now"
+        >
+          {scanning ? 'Scanning...' : scanned ? 'Scan again' : 'Scan Now'}
         </Button>
+        {onEnterManually && (
+          <button
+            type="button"
+            onClick={onEnterManually}
+            className="w-full text-center text-sm font-medium underline"
+            style={{ color: '#4c5df9' }}
+          >
+            Enter card details manually
+          </button>
+        )}
       </div>
     </div>
   )
